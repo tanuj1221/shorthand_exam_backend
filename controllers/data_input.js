@@ -94,4 +94,4 @@ async function insertChunk(connection, tableName, columns, chunk) {
     return rowValues;
   });
   await connection.query(insertQuery, [tableName, values]);
-}
+}  
