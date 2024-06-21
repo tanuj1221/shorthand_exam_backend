@@ -1,12 +1,14 @@
 const mysql = require('mysql2/promise');
+require('dotenv').config(); // Load environment variables from .env file
+
 const connection = mysql.createPool({
-    host: 'localhost',
-    user: 'root',
-    password: 'tanuj1221',
-    database: 'shorthandExam2024',
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
     waitForConnections: true,
     connectionLimit: 100000,
-    queueLimit: 0 // Added database name
-  });
+    queueLimit: 0
+});
 
-module.exports = connection
+module.exports = connection;

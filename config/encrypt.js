@@ -1,7 +1,8 @@
 const crypto = require('crypto');
+require('dotenv').config();
 
 // Replace with your own secure key (32 characters for AES-256)
-const key = crypto.createHash('sha256').update('your-secret-key').digest();
+const key = crypto.createHash('sha256').update(process.env.SECRET_KEY).digest();
 
 // Function to encrypt a JSON object using AES-256-CBC
 function encrypt(obj) {
