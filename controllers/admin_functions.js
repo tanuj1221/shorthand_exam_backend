@@ -19,18 +19,31 @@ exports.loginadmin= async (req, res) => {
     try {
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
-            const institute = results[0];
-            console.log(institute);
-  
-            if (institute.password === password) {
+            const admin = results[0];
+            console.log(admin);
+            let decryptedStoredPassword;
+            try {
+                decryptedStoredPassword = decrypt(admin.password);
+                console.log(`Decrypted stored password: '${decryptedStoredPassword}'`);   
+            } catch (error) {
+                console.error('Error decrypting stored password:', error);
+                res.status(500).send('Error decrypting stored password');
+                return;
+            }
+
+            // Ensure both passwords are treated as strings
+            const decryptedStoredPasswordStr = String(decryptedStoredPassword).trim();
+            const providedPasswordStr = String(password).trim();
+         
+            if (decryptedStoredPasswordStr === providedPasswordStr) {
                 // Set institute session
-                req.session.adminid = institute.adminid;
-                res.send('Logged in successfully as an institute!');
+                req.session.adminid = admin.adminid;
+                res.send('Logged in successfully as an admin!');
             } else {
-                res.status(401).send('Invalid credentials for institute');
+                res.status(401).send('Invalid credentials for admin');
             }
         } else {
-            res.status(404).send('Institute not found');
+            res.status(404).send('admin not found');
         }
     } catch (err) {
         res.status(500).send(err.message);

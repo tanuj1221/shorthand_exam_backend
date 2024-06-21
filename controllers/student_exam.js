@@ -35,8 +35,7 @@ exports.loginStudent = async (req, res) => {
             // Ensure both passwords are treated as strings
             const decryptedStoredPasswordStr = String(decryptedStoredPassword).trim();
             const providedPasswordStr = String(password).trim();
-            console.log(`Provided password: '${providedPasswordStr}'`);
-
+         
             if (decryptedStoredPasswordStr === providedPasswordStr) {
                 // Set student session
                 req.session.studentId = student.student_id;
