@@ -274,6 +274,13 @@ exports.updateAudioLogs = async (req, res) => {
         const [rows] = await connection.query(findAudioLogQuery, [studentId]);
 
         if (rows.length > 0) {
+            const existingLog = rows[0];
+
+            if (percentage === 0 && existingLog[audio_type] !== 0) {
+                console.log(`Existing ${audio_type} log is non-zero, requested update is 0, operation aborted.`);
+                return res.status(400).send(`Cannot update ${audio_type} to 0 as existing log is non-zero.`);
+            }
+
             console.log('Existing log found, updating:', updateAudioLogQuery, [percentage, studentId]);
             await connection.query(updateAudioLogQuery, [percentage, studentId]);
         } else {
@@ -284,7 +291,7 @@ exports.updateAudioLogs = async (req, res) => {
         const responseData = {
             student_id: studentId,
             audio_type: audio_type,
-            percentage: percentage // Stored as a string
+            percentage: percentage // Stored as a number
         };
         console.log('Percentage updated:', responseData);
 
@@ -294,8 +301,32 @@ exports.updateAudioLogs = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
+exports.getAudioLogs = async (req, res) => {
+    const studentId = req.session.studentId;
+    
+    console.log('Student ID from session:', studentId);
 
+    if (!studentId) {
+        return res.status(400).send('Student ID is required');
+    }
 
+    const findAudioLogQuery = `SELECT * FROM audiologs WHERE student_id = ?`;
+
+    try {
+        const [rows] = await connection.query(findAudioLogQuery, [studentId]);
+
+        if (rows.length > 0) {
+            console.log('Audio logs found:', rows);
+            res.send(rows[0]);
+        } else {
+            console.log('No audio logs found for student ID:', studentId);
+            res.status(404).send('No audio logs found');
+        }
+    } catch (err) {
+        console.error('Failed to fetch audio logs:', err);
+        res.status(500).send(err.message);
+    }
+};
 exports.updatePassageFinalLogs = async (req, res) => {
     const studentId = req.session.studentId;
     const { passage_type, text } = req.body;
