@@ -5,6 +5,8 @@ const xl = require('excel4node');
 const path = require('path');
 const fs = require('fs').promises;
 const Buffer = require('buffer').Buffer;
+const archiver = require('archiver');
+const moment = require('moment-timezone');
 
 const { encrypt, decrypt } =require('../config/encrypt');
 const { request } = require('http');
@@ -327,6 +329,7 @@ exports.getAudioLogs = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
+
 exports.updatePassageFinalLogs = async (req, res) => {
     const studentId = req.session.studentId;
     const { passage_type, text } = req.body;
@@ -338,15 +341,25 @@ exports.updatePassageFinalLogs = async (req, res) => {
         return res.status(400).send('Student ID is required');
     }
 
-    if (!passage_type || !['Typing Passage A', 'Typing Passage B',].includes(passage_type)) {
-        return res.status(400).send('Valid audio type is required');
+    if (!passage_type || !['Typing Passage A', 'Typing Passage B'].includes(passage_type)) {
+        return res.status(400).send('Valid passage type is required');
     }
 
+    const findStudentQuery = `SELECT examCenterCode, batchNo FROM students WHERE student_id = ?`;
     const findAudioLogQuery = `SELECT * FROM finalPassageSubmit WHERE student_id = ?`;
     const updateAudioLogQuery = `UPDATE finalPassageSubmit SET ${passage_type} = ? WHERE student_id = ?`;
     const insertAudioLogQuery = `INSERT INTO finalPassageSubmit (student_id, ${passage_type}) VALUES (?, ?)`;
 
     try {
+        // Query the database to get examCenterCode and batchNo
+        const [studentRows] = await connection.query(findStudentQuery, [studentId]);
+
+        if (studentRows.length === 0) {
+            return res.status(404).send('Student not found');
+        }
+
+        const { examCenterCode, batchNo } = studentRows[0];
+
         const [rows] = await connection.query(findAudioLogQuery, [studentId]);
 
         if (rows.length > 0) {
@@ -357,16 +370,47 @@ exports.updatePassageFinalLogs = async (req, res) => {
             await connection.query(insertAudioLogQuery, [studentId, text]);
         }
 
+        const currentTime = moment().tz('Asia/Kolkata').format('YYYYMMDD_HHmmss');
+        const sanitizedPassageType = passage_type.replace(/\s+/g, '_'); // Replace spaces with underscores
+        const fileName = `${studentId}_${examCenterCode}_${currentTime}_${batchNo}_${sanitizedPassageType}`;
+        const txtFilePath = path.join(__dirname, `${fileName}.txt`);
+        const zipFilePath = path.join(__dirname, `${fileName}.zip`);
+
+        // Write text to a file
+        fs.writeFileSync(txtFilePath, text, 'utf8');
+
+        // Create a zip file
+        const output = fs.createWriteStream(zipFilePath);
+        const archive = archiver('zip', {
+            zlib: { level: 9 } // Sets the compression level
+        });
+
+        output.on('close', function() {
+            console.log(`${archive.pointer()} total bytes`);
+            console.log('Zip file has been finalized and the output file descriptor has closed.');
+        });
+
+        archive.on('error', function(err) {
+            throw err;
+        });
+
+        archive.pipe(output);
+        archive.file(txtFilePath, { name: `${fileName}.txt` });
+        await archive.finalize();
+
+        // Clean up the text file after zipping
+        fs.unlinkSync(txtFilePath);
+
         const responseData = {
             student_id: studentId,
             passage_type: passage_type,
             text: text // Stored as a string
         };
-        console.log('text updated:', responseData);
+        console.log('Text updated and zip created:', responseData);
 
         res.send(responseData);
     } catch (err) {
-        console.error('Failed to update audio logs:', err);
+        console.log('Failed to update passage logs:', err);
         res.status(500).send(err.message);
     }
 };

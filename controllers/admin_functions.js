@@ -13,6 +13,7 @@ const { request } = require('http');
 exports.loginadmin= async (req, res) => {
     console.log("Trying admin login");
     const { userId, password } = req.body;
+    console.log(userId,password)
   
     const query1 = 'SELECT * FROM admindb WHERE adminid = ?';
   
