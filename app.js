@@ -5,6 +5,7 @@ const cors = require('cors');
 const crypto = require('crypto');
 const path = require('path');
 const adminFunctionRouter = require('./routes/admin_functions_routes');
+const examcentereRoutes = require('./routes/examcenter_routes')
 
 
 // routes 
@@ -31,7 +32,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 
-
+app.use(examcentereRoutes)
 app.use(dataInputRoutes)
 app.use(studentRoutes)
 app.use(adminFunctionRouter)

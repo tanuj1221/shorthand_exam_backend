@@ -51,12 +51,16 @@ exports.loginadmin= async (req, res) => {
     }
   };
 
-exports.deleteTable = async (req, res) => {
+  exports.deleteTable = async (req, res) => {
     const tableName = req.params.tableName;
 
-    // Validate the table name to prevent SQL injection
-    const allowedTables = ['students', 'subjectdb', 'audiodb']; // Specify allowed table names
-    if (!allowedTables.includes(tableName)) {
+    // Disallow deletion of the 'admindb' table
+    if (tableName === 'admindb') {
+        return res.status(400).send('Deletion of admindb table is not allowed');
+    }
+
+    // Validate the table name format to prevent SQL injection
+    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
         return res.status(400).send('Invalid table name');
     }
 

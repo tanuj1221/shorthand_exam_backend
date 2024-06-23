@@ -13,11 +13,25 @@ const { request } = require('http');
 
 exports.loginStudent = async (req, res) => {
     console.log("Trying student login");
-    const { userId, password } = req.body;
+    const { userId, password, ipAddress, diskIdentifier, macAddress } = req.body;
+    console.log(userId, password, ipAddress, diskIdentifier, macAddress)
 
     const query1 = 'SELECT * FROM students WHERE student_id = ?';
 
     try {
+        // Ensure loginlogs table exists
+        const createTableQuery = `
+            CREATE TABLE IF NOT EXISTS loginlogs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                student_id VARCHAR(255) NOT NULL,
+                login_time DATETIME NOT NULL,
+                ip_address VARCHAR(255) NOT NULL,
+                disk_id VARCHAR(255) NOT NULL,
+                mac_address VARCHAR(255) NOT NULL
+            )
+        `;
+        await connection.query(createTableQuery);
+
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
             const student = results[0];
@@ -41,6 +55,20 @@ exports.loginStudent = async (req, res) => {
             if (decryptedStoredPasswordStr === providedPasswordStr) {
                 // Set student session
                 req.session.studentId = student.student_id;
+                
+                // Fetch the examCenterCode
+                const examCenterCode = student.center;
+
+                // Get the current time in Kolkata, India
+                const loginTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+
+                // Insert login log
+                const insertLogQuery = `
+                    INSERT INTO loginlogs (student_id, login_time, mac_address, ip_address, disk_id)
+                    VALUES (?, ?, ?, ?, ?)
+                `;
+                await connection.query(insertLogQuery, [userId, loginTime, ipAddress, diskIdentifier, macAddress ]);
+
                 res.send('Logged in successfully as a student!');
             } else {
                 res.status(401).send('Invalid credentials for student');
@@ -53,12 +81,12 @@ exports.loginStudent = async (req, res) => {
         res.status(500).send('Internal server error');
     }
 };
-const columnsToKeep = ['student_id', 'subjectsId', 'instituteId', 'examCenterCode', 'PHOTO', 'courseId'];
+
+const columnsToKeep = ['student_id',  'instituteId', 'batchNo', 'batchdate','fullname', 'subjectsId', 'courseId', 'batch_year', 'loggedin', 'done',       'PHOTO', 'center', 'Unnamed: 13'];
 const columnsToKeepsub = ['subjectId', 'courseId'];
 const columnsToKeepaud = ['subjectId'];
-const columnsToKeepcontroller = ['center', 'controller_code', 'district'];
-const columnsToKeepcenter = ['sr', 'center', 'district', 'taluka', 'center_name', 'center_address', 'pc_count', 'win_10', 'internet', 'headphone', 'dates', 'Sanmatipatira'];
-
+const columnsToKeepcontroller = ['center', 'batchNo', 'controller_code', 'controller_name',   'controller_contact', 'controller_email',    'district'];
+const columnsToKeepcenter = ['center','center_name','center_name','pc_count','max_pc']
 exports.getStudentDetails = async (req, res) => {
     // Assuming studentId is stored in the session
     const studentId = req.session.studentId;
@@ -270,7 +298,13 @@ exports.updateAudioLogs = async (req, res) => {
 
     const findAudioLogQuery = `SELECT * FROM audiologs WHERE student_id = ?`;
     const updateAudioLogQuery = `UPDATE audiologs SET ${audio_type} = ? WHERE student_id = ?`;
-    const insertAudioLogQuery = `INSERT INTO audiologs (student_id, ${audio_type}) VALUES (?, ?)`;
+    
+    let insertAudioLogQuery;
+    if (audio_type === 'trial') {
+        insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, ?, 0, 0)`;
+    } else {
+        insertAudioLogQuery = `INSERT INTO audiologs (student_id, ${audio_type}) VALUES (?, ?)`;
+    }
 
     try {
         const [rows] = await connection.query(findAudioLogQuery, [studentId]);
@@ -286,8 +320,13 @@ exports.updateAudioLogs = async (req, res) => {
             console.log('Existing log found, updating:', updateAudioLogQuery, [percentage, studentId]);
             await connection.query(updateAudioLogQuery, [percentage, studentId]);
         } else {
-            console.log('No log found, inserting new:', insertAudioLogQuery, [studentId, percentage]);
-            await connection.query(insertAudioLogQuery, [studentId, percentage]);
+            if (audio_type === 'trial') {
+                console.log('No log found, inserting new with passageA and passageB set to 0:', insertAudioLogQuery, [studentId, percentage]);
+                await connection.query(insertAudioLogQuery, [studentId, percentage]);
+            } else {
+                console.log('No log found, inserting new:', insertAudioLogQuery, [studentId, percentage]);
+                await connection.query(insertAudioLogQuery, [studentId, percentage]);
+            }
         }
 
         const responseData = {
@@ -319,17 +358,28 @@ exports.getAudioLogs = async (req, res) => {
 
         if (rows.length > 0) {
             console.log('Audio logs found:', rows);
-            res.send(rows[0]);
+            
+            const audioLogs = rows[0];
+            
+            // Convert null values to 0
+            audioLogs.trial = audioLogs.trial || 0;
+            audioLogs.passageA = audioLogs.passageA || 0;
+            audioLogs.passageB = audioLogs.passageB || 0;
+            
+            res.send(audioLogs);
         } else {
             console.log('No audio logs found for student ID:', studentId);
-            res.status(404).send('No audio logs found');
+            res.json({
+                trial: 0,
+                passageA: 0,
+                passageB: 0
+            });
         }
     } catch (err) {
         console.error('Failed to fetch audio logs:', err);
         res.status(500).send(err.message);
     }
 };
-
 exports.updatePassageFinalLogs = async (req, res) => {
     const studentId = req.session.studentId;
     const { passage_type, text } = req.body;
@@ -345,7 +395,7 @@ exports.updatePassageFinalLogs = async (req, res) => {
         return res.status(400).send('Valid passage type is required');
     }
 
-    const findStudentQuery = `SELECT examCenterCode, batchNo FROM students WHERE student_id = ?`;
+    const findStudentQuery = `SELECT center, batchNo FROM students WHERE student_id = ?`;
     const findAudioLogQuery = `SELECT * FROM finalPassageSubmit WHERE student_id = ?`;
     const updateAudioLogQuery = `UPDATE finalPassageSubmit SET ${passage_type} = ? WHERE student_id = ?`;
     const insertAudioLogQuery = `INSERT INTO finalPassageSubmit (student_id, ${passage_type}) VALUES (?, ?)`;
@@ -460,7 +510,7 @@ exports.feedback = async (req, res) => {
 
 exports.getcontrollerpass = async (req, res) => {
     const studentId = req.session.studentId;
-    const studentQuery = 'SELECT examCenterCode FROM students WHERE student_id = ?';
+    const studentQuery = 'SELECT center FROM students WHERE student_id = ?';
     const centersQuery = 'SELECT * FROM examcenterdb WHERE center = ?';
     const controllersQuery = 'SELECT * FROM controllerdb WHERE center = ?';
 
@@ -470,7 +520,7 @@ exports.getcontrollerpass = async (req, res) => {
             return res.status(404).send('Student not found');
         }
         const student = students[0];
-        const centrcode = student.examCenterCode
+        const centrcode = student.center
 
 
         const [centers] = await connection.query(centersQuery, [centrcode]);
@@ -504,7 +554,7 @@ exports.getcontrollerpass = async (req, res) => {
             decryptedStoredPassword = decrypt(controllers1.controller_pass);
             console.log(`Decrypted stored password: '${decryptedStoredPassword}'`);
         } catch (error) {
-            console.error('Error decrypting stored password:', error);
+            console.log('Error decrypting stored password:', error);
             res.status(500).send('Error decrypting stored password');
             return;
         }
