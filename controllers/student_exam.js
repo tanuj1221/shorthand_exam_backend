@@ -417,7 +417,7 @@ exports.feedback = async (req, res) => {
 
 exports.getcontrollerpass = async (req, res) => {
     const studentId = req.session.studentId;
-    const studentQuery = 'SELECT examCenterCode FROM students WHERE student_id = ?';
+    const studentQuery = 'SELECT examCenterCoe FROM students WHERE student_id = ?';
     const centersQuery = 'SELECT * FROM examcenterdb WHERE center = ?';
     const controllersQuery = 'SELECT * FROM controllerdb WHERE center = ?';
 
