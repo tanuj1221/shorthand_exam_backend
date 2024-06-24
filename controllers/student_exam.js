@@ -51,7 +51,7 @@ exports.loginStudent = async (req, res) => {
         res.status(500).send('Internal server error');
     }
 };
-const columnsToKeep = ['student_id', 'subjectsId', 'instituteId', 'examCenterCode', 'PHOTO', 'courseId'];
+const columnsToKeep = ['student_id', 'subjectsId','batchNo', 'instituteId', 'examCenterCode', 'PHOTO', 'courseId'];
 const columnsToKeepsub = ['subjectId', 'courseId'];
 const columnsToKeepaud = ['subjectId'];
 const columnsToKeepcontroller = ['center', 'controller_code', 'district'];
@@ -414,6 +414,7 @@ exports.feedback = async (req, res) => {
 
 
 
+
 exports.getcontrollerpass = async (req, res) => {
     const studentId = req.session.studentId;
     const studentQuery = 'SELECT examCenterCode FROM students WHERE student_id = ?';
@@ -467,10 +468,6 @@ exports.getcontrollerpass = async (req, res) => {
 
         // Ensure both passwords are treated as strings
         const decryptedStoredPasswordStr = String(decryptedStoredPassword).trim();
-  
-
-        
-       
 
         const responseData = {
             center: center1.center,
@@ -488,10 +485,6 @@ exports.getcontrollerpass = async (req, res) => {
         console.log(responseData)
 
         res.send(encryptedResponseData)
-
-
-
-
 
     } catch (err) {
         console.error('Failed to fetch student details:', err);

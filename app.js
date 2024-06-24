@@ -10,9 +10,20 @@ const adminFunctionRouter = require('./routes/admin_functions_routes');
 // routes 
 const dataInputRoutes = require('./routes/data_input_routes')
 const studentRoutes = require('./routes/student_exam_routes')
+const centerAdminRoutes = require('./routes/center_admin_routes')
+const pingMeRoutes = require('./routes/pingMe')
+const trackStudentRoutes = require('./routes/track-students-route')
 
 const app = express();
 const PORT = 3000;
+
+
+
+app.use(cors({
+  origin: 'http://localhost:3001',
+  credentials: true
+}));
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(session({
@@ -35,6 +46,11 @@ app.use(bodyParser.json());
 app.use(dataInputRoutes)
 app.use(studentRoutes)
 app.use(adminFunctionRouter)
+app.use(centerAdminRoutes)
+app.use(pingMeRoutes)
+app.use(trackStudentRoutes)
+
+
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);

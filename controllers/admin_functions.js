@@ -20,7 +20,7 @@ exports.loginadmin= async (req, res) => {
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
             const admin = results[0];
-            console.log(admin);
+            console.log("data: "+admin);
             let decryptedStoredPassword;
             try {
                 decryptedStoredPassword = decrypt(admin.password);
