@@ -370,7 +370,12 @@ exports.getAudioLogs = async (req, res) => {
                 audioLogs.passageB = 0;
             }
             
-            res.send(audioLogs);
+            // res.send(audioLogs);
+            res.json({
+                trial: 0,
+                passageA: 0,
+                passageB: 0
+            });
         } else {
             console.log('No audio logs found for student ID:', studentId);
             res.json({
