@@ -280,7 +280,6 @@ exports.getaudios = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
-
 exports.updateAudioLogs = async (req, res) => {
     const studentId = req.session.studentId;
     const { audio_type, percentage } = req.body;
@@ -302,8 +301,10 @@ exports.updateAudioLogs = async (req, res) => {
     let insertAudioLogQuery;
     if (audio_type === 'trial') {
         insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, ?, 0, 0)`;
-    } else {
-        insertAudioLogQuery = `INSERT INTO audiologs (student_id, ${audio_type}) VALUES (?, ?)`;
+    } else if (audio_type === 'passageA') {
+        insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, 0, ?, 0)`;
+    } else if (audio_type === 'passageB') {
+        insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, 0, 0, ?)`;
     }
 
     try {
@@ -320,13 +321,8 @@ exports.updateAudioLogs = async (req, res) => {
             console.log('Existing log found, updating:', updateAudioLogQuery, [percentage, studentId]);
             await connection.query(updateAudioLogQuery, [percentage, studentId]);
         } else {
-            if (audio_type === 'trial') {
-                console.log('No log found, inserting new with passageA and passageB set to 0:', insertAudioLogQuery, [studentId, percentage]);
-                await connection.query(insertAudioLogQuery, [studentId, percentage]);
-            } else {
-                console.log('No log found, inserting new:', insertAudioLogQuery, [studentId, percentage]);
-                await connection.query(insertAudioLogQuery, [studentId, percentage]);
-            }
+            console.log('No log found, inserting new:', insertAudioLogQuery, [studentId, percentage]);
+            await connection.query(insertAudioLogQuery, [studentId, percentage]);
         }
 
         const responseData = {
@@ -365,6 +361,14 @@ exports.getAudioLogs = async (req, res) => {
             audioLogs.trial = audioLogs.trial || 0;
             audioLogs.passageA = audioLogs.passageA || 0;
             audioLogs.passageB = audioLogs.passageB || 0;
+            
+            // Check if passageA or passageB is null and set them to 0
+            if (audioLogs.passageA === null) {
+                audioLogs.passageA = 0;
+            }
+            if (audioLogs.passageB === null) {
+                audioLogs.passageB = 0;
+            }
             
             res.send(audioLogs);
         } else {

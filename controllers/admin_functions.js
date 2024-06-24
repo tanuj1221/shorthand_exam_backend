@@ -76,3 +76,24 @@ exports.loginadmin= async (req, res) => {
 };
 
 
+exports.resetAllAudioLogs = async (req, res) => {
+    const updateAudioLogQuery = `UPDATE audiologs SET trial = 0, passageA = 0, passageB = 0`;
+
+    try {
+        console.log('Resetting all audio logs to 0:', updateAudioLogQuery);
+        const [result] = await connection.query(updateAudioLogQuery);
+
+        const responseData = {
+            message: 'All audio logs have been reset to 0',
+            affectedRows: result.affectedRows
+        };
+        console.log('Audio logs reset:', responseData);
+
+        res.send(responseData);
+    } catch (err) {
+        console.error('Failed to reset audio logs:', err);
+        res.status(500).send(err.message);
+    }
+};
+
+
