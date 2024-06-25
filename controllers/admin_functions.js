@@ -13,6 +13,7 @@ const { request } = require('http');
 exports.loginadmin= async (req, res) => {
     console.log("Trying admin login");
     const { userId, password } = req.body;
+    console.log(userId,password)
   
     const query1 = 'SELECT * FROM admindb WHERE adminid = ?';
   
@@ -50,12 +51,16 @@ exports.loginadmin= async (req, res) => {
     }
   };
 
-exports.deleteTable = async (req, res) => {
+  exports.deleteTable = async (req, res) => {
     const tableName = req.params.tableName;
 
-    // Validate the table name to prevent SQL injection
-    const allowedTables = ['students', 'subjectdb', 'audiodb']; // Specify allowed table names
-    if (!allowedTables.includes(tableName)) {
+    // Disallow deletion of the 'admindb' table
+    if (tableName === 'admindb') {
+        return res.status(400).send('Deletion of admindb table is not allowed');
+    }
+
+    // Validate the table name format to prevent SQL injection
+    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
         return res.status(400).send('Invalid table name');
     }
 
@@ -66,6 +71,27 @@ exports.deleteTable = async (req, res) => {
         res.send(`Table ${tableName} deleted successfully`);
     } catch (err) {
         console.error(`Failed to delete table ${tableName}:`, err);
+        res.status(500).send(err.message);
+    }
+};
+
+
+exports.resetAllAudioLogs = async (req, res) => {
+    const updateAudioLogQuery = `UPDATE audiologs SET trial = 0, passageA = 0, passageB = 0`;
+
+    try {
+        console.log('Resetting all audio logs to 0:', updateAudioLogQuery);
+        const [result] = await connection.query(updateAudioLogQuery);
+
+        const responseData = {
+            message: 'All audio logs have been reset to 0',
+            affectedRows: result.affectedRows
+        };
+        console.log('Audio logs reset:', responseData);
+
+        res.send(responseData);
+    } catch (err) {
+        console.error('Failed to reset audio logs:', err);
         res.status(500).send(err.message);
     }
 };
