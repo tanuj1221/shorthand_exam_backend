@@ -57,6 +57,7 @@ exports.fetchUpdateTable = async (req, res) => {
                 if (typeof student.loggedin === 'string') {
                     student.loggedin = encryptionInterface.decrypt(student.loggedin);
                 }
+                
                 return student;
             });
 

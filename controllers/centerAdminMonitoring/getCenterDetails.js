@@ -1,5 +1,6 @@
 const connection = require('../../config/db1');
 const ExamCenterDTO = require('../../dto/examCenterDb');
+const encryptionInterface = require('../../config/encrypt')
 
 exports.getExamCenterDetails = async (req, res) => {
     const center = req.session.centerId;
@@ -19,6 +20,9 @@ exports.getExamCenterDetails = async (req, res) => {
                     result.pc_count,
                     result.max_pc
                 );
+                if (typeof examCenter.fullname === 'string') {
+                    examCenter.center_address = encryptionInterface.decrypt(examCenter.center_address);
+                }
                 return examCenter;
             });
             res.status(200).json(examCenterDTO);
