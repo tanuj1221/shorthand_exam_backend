@@ -20,7 +20,7 @@ exports.getExamCenterDetails = async (req, res) => {
                     result.pc_count,
                     result.max_pc
                 );
-                if (typeof examCenter.fullname === 'string') {
+                if (typeof examCenter.center_address === 'string') {
                     examCenter.center_address = encryptionInterface.decrypt(examCenter.center_address);
                 }
                 console.log("examCenter.center_address: "+ examCenter.center_address);
