@@ -25,15 +25,15 @@ exports.getStudentsTrack = async (req, res) => {
             audiologs.trial,
             audiologs.passageA,
             audiologs.passageB,
-            studentslog.loginTime,
-            studentslog.login,
-            studentslog.trial_time,
-            studentslog.audio1_time,
-            studentslog.passage1_time,
-            studentslog.audio2_time,
-            studentslog.passage2_time,
-            studentslog.feedback_time,
-            studentslog.logout_time
+            studentlogs.loginTime,
+            studentlogs.login,
+            studentlogs.trial_time,
+            studentlogs.audio1_time,
+            studentlogs.passage1_time,
+            studentlogs.audio2_time,
+            studentlogs.passage2_time,
+            studentlogs.feedback_time,
+            studentlogs.logout_time
         FROM 
             students 
         INNER JOIN 
@@ -41,9 +41,9 @@ exports.getStudentsTrack = async (req, res) => {
         ON 
             students.student_id = audiologs.student_id
         INNER JOIN
-            studentslog
+            studentlogs
         ON
-            students.student_id = studentslog.student_id
+            students.student_id = studentlogs.student_id
     `;
 
     if (examCenterCode && examCenterCode !=0 && batchNo) {
