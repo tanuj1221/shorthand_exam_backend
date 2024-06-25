@@ -32,8 +32,7 @@ exports.getStudentsTrack = async (req, res) => {
             studentlogs.passage1_time,
             studentlogs.audio2_time,
             studentlogs.passage2_time,
-            studentlogs.feedback_time,
-            studentlogs.logout_time
+            studentlogs.feedback_time
         FROM 
             students 
         INNER JOIN 
@@ -87,8 +86,7 @@ exports.getStudentsTrack = async (req, res) => {
                     result.passage1_time,
                     result.audio2_time,
                     result.passage2_time,
-                    result.feedback_time,
-                    result.logout_time
+                    result.feedback_time
                 );
                 
                 if (typeof studentTrack.fullname === 'string') {
