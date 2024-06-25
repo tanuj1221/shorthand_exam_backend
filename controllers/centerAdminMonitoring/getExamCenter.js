@@ -1,5 +1,7 @@
 const connection = require('../../config/db1');
+
 exports.getExamCenter = async (req, res) => {
+    
 
     const query = 'SELECT center, centerpass FROM examcenterdb';
     try{
@@ -17,5 +19,4 @@ exports.getExamCenter = async (req, res) => {
     }catch (err) {
         res.status(500).send(err.message);
     }
-    return;
 }

@@ -13,11 +13,11 @@ const studentRoutes = require('./routes/student_exam_routes')
 const centerAdminRoutes = require('./routes/center_admin_routes')
 const pingMeRoutes = require('./routes/pingMe')
 const trackStudentRoutes = require('./routes/track-students-route')
+const examCenterAdminRoutes = require('./routes/exam_center_admin')
+const examCenterDataRoutes = require('./routes/examCenterRoutes')
 
 const app = express();
 const PORT = 3000;
-
-
 
 app.use(cors({
   origin: 'http://localhost:3001',
@@ -51,6 +51,8 @@ app.use(adminFunctionRouter)
 app.use(centerAdminRoutes)
 app.use(pingMeRoutes)
 app.use(trackStudentRoutes)
+app.use(examCenterAdminRoutes)
+app.use(examCenterDataRoutes)
 
 app.use(express.static(path.join(__dirname, 'build'))); // 'build' is the default directory for create-react-app builds
 
