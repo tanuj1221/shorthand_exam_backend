@@ -1,9 +1,9 @@
 const connection = require('../config/db1');
-
+const fs = require('fs').promises; 
 const xl = require('excel4node');
 
 const path = require('path');
-const fs = require('fs');
+const fs1 = require('fs');
 const Buffer = require('buffer').Buffer;
 const archiver = require('archiver');
 const moment = require('moment-timezone');
@@ -30,8 +30,8 @@ exports.loginStudent = async (req, res) => {
         `;
         await connection.query(createLoginLogsTableQuery);
 
-        // Ensure studentlogs table exists
-        const createstudentlogsTableQuery = `
+        // Ensure studntslogs table exists
+        const createstudntslogsTableQuery = `
             CREATE TABLE IF NOT EXISTS studentlogs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 student_id VARCHAR(255) NOT NULL,
@@ -47,7 +47,7 @@ exports.loginStudent = async (req, res) => {
                 UNIQUE (student_id)
             )
         `;
-        await connection.query(createstudentlogsTableQuery);
+        await connection.query(createstudntslogsTableQuery);
 
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
@@ -85,12 +85,12 @@ exports.loginStudent = async (req, res) => {
                 await connection.query(insertLogQuery, [userId, loginTime, ipAddress, diskIdentifier, macAddress]);
 
                 // Insert or update student login details
-                const insertstudentlogsQuery = `
+                const insertstudntslogsQuery = `
                     INSERT INTO studentlogs (student_id, center, loginTime, login)
                     VALUES (?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE loginTime = ?, login = ?
                 `;
-                await connection.query(insertstudentlogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
+                await connection.query(insertstudntslogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
 
                 res.send('Logged in successfully as a student!');
             } else {
@@ -512,9 +512,6 @@ exports.updatePassageFinalLogs = async (req, res) => {
         return res.status(400).send('MAC address is required');
     }
 
-    // Replace colons in the MAC address to ensure valid file names
-    const sanitizedMac = mac.replace(/:/g, '-');
-
     const findStudentQuery = `SELECT center, batchNo FROM students WHERE student_id = ?`;
     const findAudioLogQuery = `SELECT * FROM finalPassageSubmit WHERE student_id = ?`;
     const updateAudioLogQuery = `UPDATE finalPassageSubmit SET ${passage_type} = ? WHERE student_id = ?`;
@@ -540,34 +537,26 @@ exports.updatePassageFinalLogs = async (req, res) => {
 
         const currentTime = moment().tz('Asia/Kolkata').format('YYYYMMDD_HHmmss');
         const sanitizedPassageType = passage_type.replace(/\s+/g, '_'); // Replace spaces with underscores
-        const fileName = `${studentId}_${examCenterCode}_${currentTime}_${batchNo}_${sanitizedPassageType}_${sanitizedMac}`;
+        const fileName = `${studentId}_${examCenterCode}_${currentTime}_${batchNo}_${sanitizedPassageType}_${mac}`;
         const folderName = 'typing_passage_logs';
         const folderPath = path.join(__dirname, '..', folderName);
 
-        // Ensure the directory exists
-        if (!fs.existsSync(folderPath)) {
-            fs.mkdirSync(folderPath, { recursive: true });
+        // Create the folder if it doesn't exist
+        if (!fs1.existsSync(folderPath)) {
+            fs1.mkdirSync(folderPath, { recursive: true });
         }
 
         const txtFilePath = path.join(folderPath, `${fileName}.txt`);
         const zipFilePath = path.join(folderPath, `${fileName}.zip`);
 
         // Write text to a file
-        fs.writeFileSync(txtFilePath, text, 'utf8');
+        fs1.writeFileSync(txtFilePath, text, 'utf8');
 
         // Create a zip file
-        const output = fs.createWriteStream(zipFilePath);
+        const output = fs1.createWriteStream(zipFilePath);
         const archive = archiver('zip', {
             zlib: { level: 9 } // Sets the compression level
         });
-
-        archive.on('error', function(err) {
-            throw err;
-        });
-
-        archive.pipe(output);
-        archive.file(txtFilePath, { name: `${fileName}.txt` });
-        archive.finalize();
 
         output.on('close', function() {
             // Clean up the text file after zipping
@@ -581,11 +570,20 @@ exports.updatePassageFinalLogs = async (req, res) => {
 
             res.send(responseData);
         });
+
+        archive.on('error', function(err) {
+            throw err;
+        });
+
+        archive.pipe(output);
+        archive.file(txtFilePath, { name: `${fileName}.txt` });
+        archive.finalize();
     } catch (err) {
         console.error('Failed to update passage final logs:', err);
         res.status(500).send(err.message);
     }
 };
+
 exports.feedback = async (req, res) => {
     const studentId = req.session.studentId;
     const { question1, question2, question3 } = req.body;
