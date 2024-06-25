@@ -23,6 +23,7 @@ exports.getExamCenterDetails = async (req, res) => {
                 if (typeof examCenter.fullname === 'string') {
                     examCenter.center_address = encryptionInterface.decrypt(examCenter.center_address);
                 }
+                console.log("examCenter.center_address: "+ examCenter.center_address);
                 return examCenter;
             });
             res.status(200).json(examCenterDTO);
