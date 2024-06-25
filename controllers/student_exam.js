@@ -12,15 +12,13 @@ const { encrypt, decrypt } =require('../config/encrypt');
 const { request } = require('http');
 
 exports.loginStudent = async (req, res) => {
-    console.log("Trying student login");
     const { userId, password, ipAddress, diskIdentifier, macAddress } = req.body;
-    console.log(userId, password, ipAddress, diskIdentifier, macAddress)
 
     const query1 = 'SELECT * FROM students WHERE student_id = ?';
 
     try {
         // Ensure loginlogs table exists
-        const createTableQuery = `
+        const createLoginLogsTableQuery = `
             CREATE TABLE IF NOT EXISTS loginlogs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 student_id VARCHAR(255) NOT NULL,
@@ -30,18 +28,35 @@ exports.loginStudent = async (req, res) => {
                 mac_address VARCHAR(255) NOT NULL
             )
         `;
-        await connection.query(createTableQuery);
+        await connection.query(createLoginLogsTableQuery);
+
+        // Ensure studntslogs table exists
+        const createstudntslogsTableQuery = `
+            CREATE TABLE IF NOT EXISTS studntslogs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                student_id VARCHAR(255) NOT NULL,
+                center VARCHAR(255) NOT NULL,
+                loginTime DATETIME NOT NULL,
+                login VARCHAR(255) NOT NULL,
+                trial_time VARCHAR(255),
+                audio1_time VARCHAR(255),
+                passage1_time VARCHAR(255),
+                audio2_time VARCHAR(255),
+                passage2_time VARCHAR(255),
+                feedback_time VARCHAR(255),
+                UNIQUE (student_id)
+            )
+        `;
+        await connection.query(createstudntslogsTableQuery);
 
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
             const student = results[0];
-            console.log(student);
 
             // Decrypt the stored password
             let decryptedStoredPassword;
             try {
                 decryptedStoredPassword = decrypt(student.password);
-                console.log(`Decrypted stored password: '${decryptedStoredPassword}'`);
             } catch (error) {
                 console.error('Error decrypting stored password:', error);
                 res.status(500).send('Error decrypting stored password');
@@ -51,11 +66,11 @@ exports.loginStudent = async (req, res) => {
             // Ensure both passwords are treated as strings
             const decryptedStoredPasswordStr = String(decryptedStoredPassword).trim();
             const providedPasswordStr = String(password).trim();
-         
+
             if (decryptedStoredPasswordStr === providedPasswordStr) {
                 // Set student session
                 req.session.studentId = student.student_id;
-                
+
                 // Fetch the examCenterCode
                 const examCenterCode = student.center;
 
@@ -67,7 +82,15 @@ exports.loginStudent = async (req, res) => {
                     INSERT INTO loginlogs (student_id, login_time, mac_address, ip_address, disk_id)
                     VALUES (?, ?, ?, ?, ?)
                 `;
-                await connection.query(insertLogQuery, [userId, loginTime, ipAddress, diskIdentifier, macAddress ]);
+                await connection.query(insertLogQuery, [userId, loginTime, ipAddress, diskIdentifier, macAddress]);
+
+                // Insert or update student login details
+                const insertstudntslogsQuery = `
+                    INSERT INTO studntslogs (student_id, center, loginTime, login)
+                    VALUES (?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE loginTime = ?, login = ?
+                `;
+                await connection.query(insertstudntslogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
 
                 res.send('Logged in successfully as a student!');
             } else {
@@ -81,7 +104,6 @@ exports.loginStudent = async (req, res) => {
         res.status(500).send('Internal server error');
     }
 };
-
 const columnsToKeep = ['student_id',  'instituteId', 'batchNo', 'batchdate','fullname', 'subjectsId', 'courseId', 'batch_year', 'loggedin', 'done',       'PHOTO', 'center', 'Unnamed: 13'];
 const columnsToKeepsub = ['subjectId', 'courseId'];
 const columnsToKeepaud = ['subjectId'];
@@ -101,7 +123,6 @@ exports.getStudentDetails = async (req, res) => {
             return res.status(404).send('Student not found');
         }
         const student = students[0];
-        console.log(student)
 
         // Decrypt the encrypted fields
 
@@ -109,9 +130,7 @@ exports.getStudentDetails = async (req, res) => {
         for (const field in student) {
             if (student.hasOwnProperty(field) && !columnsToKeep.includes(field)) {
                 try {
-                    console.log(`Decrypting field: ${field}`); // Debugging
                     student[field] = decrypt(student[field]);
-                    console.log(`Decrypted value: ${student[field]}`); // Debugging
                 } catch (err) {
                     console.error(`Failed to decrypt field ${field}:`, err);
                     throw new Error(`Failed to decrypt field ${field}`);
@@ -140,9 +159,7 @@ exports.getStudentDetails = async (req, res) => {
         for (const field in subject) {
             if (subject.hasOwnProperty(field) && !columnsToKeepsub.includes(field)) {
                 try {
-                    console.log(`Decrypting field: ${field}`); // Debugging
                     subject[field] = decrypt(subject[field]);
-                    console.log(`Decrypted value: ${subject[field]}`); // Debugging
                 } catch (err) {
                     console.error(`Failed to decrypt field ${field}:`, err);
                     throw new Error(`Failed to decrypt field ${field}`);
@@ -198,9 +215,7 @@ exports.getaudios = async (req, res) => {
         for (const field in student) {
             if (student.hasOwnProperty(field) && !columnsToKeep.includes(field)) {
                 try {
-                    console.log(`Decrypting field: ${field}`); // Debugging
                     student[field] = decrypt(student[field]);
-                    console.log(`Decrypted value: ${student[field]}`); // Debugging
                 } catch (err) {
                     console.error(`Failed to decrypt field ${field}:`, err);
                     throw new Error(`Failed to decrypt field ${field}`);
@@ -223,9 +238,7 @@ exports.getaudios = async (req, res) => {
         for (const field in subject) {
             if (subject.hasOwnProperty(field) && !columnsToKeepsub.includes(field)) {
                 try {
-                    console.log(`Decrypting field: ${field}`); // Debugging
                     subject[field] = decrypt(subject[field]);
-                    console.log(`Decrypted value: ${subject[field]}`); // Debugging
                 } catch (err) {
                     console.error(`Failed to decrypt field ${field}:`, err);
                     throw new Error(`Failed to decrypt field ${field}`);
@@ -242,9 +255,7 @@ exports.getaudios = async (req, res) => {
         for (const field in audio) {
             if (audio.hasOwnProperty(field) && !columnsToKeepaud.includes(field)) {
                 try {
-                    console.log(`Decrypting field: ${field}`); // Debugging
                     audio[field] = decrypt(audio[field]);
-                    console.log(`Decrypted value: ${audio[field]}`); // Debugging
                 } catch (err) {
                     console.error(`Failed to decrypt field ${field}:`, err);
                     throw new Error(`Failed to decrypt field ${field}`);
@@ -284,8 +295,6 @@ exports.updateAudioLogs = async (req, res) => {
     const studentId = req.session.studentId;
     const { audio_type, percentage } = req.body;
 
-    console.log('Received request:', req.body);
-    console.log('Student ID from session:', studentId);
 
     if (!studentId) {
         return res.status(400).send('Student ID is required');
@@ -314,14 +323,11 @@ exports.updateAudioLogs = async (req, res) => {
             const existingLog = rows[0];
 
             if (percentage === 0 && existingLog[audio_type] !== 0) {
-                console.log(`Existing ${audio_type} log is non-zero, requested update is 0, operation aborted.`);
                 return res.status(400).send(`Cannot update ${audio_type} to 0 as existing log is non-zero.`);
             }
 
-            console.log('Existing log found, updating:', updateAudioLogQuery, [percentage, studentId]);
             await connection.query(updateAudioLogQuery, [percentage, studentId]);
         } else {
-            console.log('No log found, inserting new:', insertAudioLogQuery, [studentId, percentage]);
             await connection.query(insertAudioLogQuery, [studentId, percentage]);
         }
 
@@ -330,7 +336,6 @@ exports.updateAudioLogs = async (req, res) => {
             audio_type: audio_type,
             percentage: percentage // Stored as a number
         };
-        console.log('Percentage updated:', responseData);
 
         res.send(responseData);
     } catch (err) {
@@ -341,7 +346,6 @@ exports.updateAudioLogs = async (req, res) => {
 exports.getAudioLogs = async (req, res) => {
     const studentId = req.session.studentId;
     
-    console.log('Student ID from session:', studentId);
 
     if (!studentId) {
         return res.status(400).send('Student ID is required');
@@ -353,7 +357,6 @@ exports.getAudioLogs = async (req, res) => {
         const [rows] = await connection.query(findAudioLogQuery, [studentId]);
 
         if (rows.length > 0) {
-            console.log('Audio logs found:', rows);
             
             const audioLogs = rows[0];
             
@@ -377,7 +380,6 @@ exports.getAudioLogs = async (req, res) => {
                 passageB: 0
             });
         } else {
-            console.log('No audio logs found for student ID:', studentId);
             res.json({
                 trial: 0,
                 passageA: 0,
@@ -393,8 +395,6 @@ exports.updatePassageFinalLogs = async (req, res) => {
     const studentId = req.session.studentId;
     const { passage_type, text } = req.body;
 
-    console.log('Received request:', req.body);
-    console.log('Student ID from session:', studentId);
 
     if (!studentId) {
         return res.status(400).send('Student ID is required');
@@ -422,10 +422,8 @@ exports.updatePassageFinalLogs = async (req, res) => {
         const [rows] = await connection.query(findAudioLogQuery, [studentId]);
 
         if (rows.length > 0) {
-            console.log('Existing log found, updating:', updateAudioLogQuery, [text, studentId]);
             await connection.query(updateAudioLogQuery, [text, studentId]);
         } else {
-            console.log('No log found, inserting new:', insertAudioLogQuery, [studentId, text]);
             await connection.query(insertAudioLogQuery, [studentId, text]);
         }
 
@@ -445,8 +443,6 @@ exports.updatePassageFinalLogs = async (req, res) => {
         });
 
         output.on('close', function() {
-            console.log(`${archive.pointer()} total bytes`);
-            console.log('Zip file has been finalized and the output file descriptor has closed.');
         });
 
         archive.on('error', function(err) {
@@ -465,11 +461,9 @@ exports.updatePassageFinalLogs = async (req, res) => {
             passage_type: passage_type,
             text: text // Stored as a string
         };
-        console.log('Text updated and zip created:', responseData);
 
         res.send(responseData);
     } catch (err) {
-        console.log('Failed to update passage logs:', err);
         res.status(500).send(err.message);
     }
 };
@@ -478,8 +472,6 @@ exports.feedback = async (req, res) => {
     const studentId = req.session.studentId;
     const { question1, question2, question3 } = req.body;
 
-    console.log('Received request:', req.body);
-    console.log('Student ID from session:', studentId);
 
     if (!studentId) {
         return res.status(400).send('Student ID is required');
@@ -493,10 +485,8 @@ exports.feedback = async (req, res) => {
         const [rows] = await connection.query(findLogQuery, [studentId]);
 
         if (rows.length > 0) {
-            console.log('Existing log found, updating:', updateLogQuery, [question1, question2, question3, studentId]);
             await connection.query(updateLogQuery, [question1, question2, question3, studentId]);
         } else {
-            console.log('No log found, inserting new:', insertLogQuery, [studentId, question1, question2, question3]);
             await connection.query(insertLogQuery, [studentId, question1, question2, question3]);
         }
 
@@ -515,7 +505,116 @@ exports.feedback = async (req, res) => {
     }
 };
 
+exports.logTextInput = async (req, res) => {
+    const studentId = req.session.studentId;
+    const { text, identifier, time } = req.body;
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS textlogs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        mina FLOAT DEFAULT 0,
+        texta TEXT,
+        minb FLOAT DEFAULT 0,
+        textb TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY (student_id)
+      )
+    `;
+  
+    if (!studentId) {
+      console.error('Student ID is required');
+      return res.status(400).send('Student ID is required');
+    }
+  
+    try {
+      // Create the textlogs table if it doesn't exist
+      await connection.query(createTableQuery);
+  
+      let insertQuery;
+      let values;
+  
+      if (identifier === 'passageA') {
+        insertQuery = 'INSERT INTO textlogs (student_id, mina, texta) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE mina = VALUES(mina), texta = VALUES(texta)';
+        values = [studentId, time, text];
+      } else if (identifier === 'passageB') {
+        insertQuery = 'INSERT INTO textlogs (student_id, minb, textb) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE minb = VALUES(minb), textb = VALUES(textb)';
+        values = [studentId, time, text];
+      } else {
+        console.error('Invalid identifier:', identifier);
+        return res.status(400).send('Invalid identifier');
+      }
+  
+      // Check if the text is empty, null, or an empty string
+      if (text && text.trim() !== '') {
+        await connection.query(insertQuery, values);
+        console.log('Response done');
+      } else {
+        console.log('Text is empty, skipping database insertion');
+      }
+  
+      res.sendStatus(200);
+    } catch (err) {
+      console.error('Failed to log text input:', err);
+      res.status(500).send(err.message);
+    }
+  };
 
+  exports.getPassageProgress = async (req, res) => {
+    const studentId = req.session.studentId;
+    const { identifier } = req.body;
+  
+    if (!studentId) {
+      console.error('Student ID is required');
+      return res.status(400).send('Student ID is required');
+    }
+  
+    if (!identifier) {
+      console.error('Passage identifier is required');
+      return res.status(400).send('Passage identifier is required');
+    }
+  
+    try {
+      const query =
+        'SELECT mina, texta, minb, textb FROM textlogs WHERE student_id = ? ORDER BY created_at DESC LIMIT 1';
+      const [rows] = await connection.query(query, [studentId]);
+  
+      if (rows.length === 0) {
+        console.log('No data found for the student');
+        return res.status(404).send('No data found for the student');
+      }
+  
+      const { mina, texta, minb, textb } = rows[0];
+  
+      const responseData = {};
+  
+      if (identifier === 'passageA') {
+        if (mina === null || texta === null || texta === '') {
+          console.log('No data found for passageA');
+          return res.status(404).send('No data found for passageA');
+        }
+        console.log('Sending data for passageA');
+        responseData.timeLeft = mina;
+        responseData.typedText = texta;
+      } else if (identifier === 'passageB') {
+        if (minb === null || textb === null || textb === '') {
+          console.log('No data found for passageB');
+          return res.status(404).send('No data found for passageB');
+        }
+        console.log('Sending data for passageB');
+        responseData.timeLeft = minb;
+        responseData.typedText = textb;
+      } else {
+        console.error('Invalid passage identifier:', identifier);
+        return res.status(400).send('Invalid passage identifier');
+      }
+  
+      console.log('Response data:', responseData);
+      res.json(responseData);
+    } catch (err) {
+      console.error('Failed to fetch passage progress:', err);
+      res.status(500).send(err.message);
+    }
+  };
 
 exports.getcontrollerpass = async (req, res) => {
     const studentId = req.session.studentId;
@@ -540,9 +639,7 @@ exports.getcontrollerpass = async (req, res) => {
         for (const field in center1) {
             if (center1.hasOwnProperty(field) && !columnsToKeepcenter.includes(field)) {
                 try {
-                    console.log(`Decrypting field: ${field}`); // Debugging
                     center1[field] = decrypt(center1[field]);
-                    console.log(`Decrypted value: ${center1[field]}`); // Debugging
                 } catch (err) {
                     console.error(`Failed to decrypt field ${field}:`, err);
                     throw new Error(`Failed to decrypt field ${field}`);
@@ -561,9 +658,7 @@ exports.getcontrollerpass = async (req, res) => {
         let decryptedStoredPassword;
         try {
             decryptedStoredPassword = decrypt(controllers1.controller_pass);
-            console.log(`Decrypted stored password: '${decryptedStoredPassword}'`);
         } catch (error) {
-            console.log('Error decrypting stored password:', error);
             res.status(500).send('Error decrypting stored password');
             return;
         }
@@ -588,7 +683,6 @@ exports.getcontrollerpass = async (req, res) => {
                 encryptedResponseData[key] = encrypt(responseData[key].toString());
             }
         }
-        console.log(responseData)
 
         res.send(encryptedResponseData)
 
