@@ -30,8 +30,8 @@ exports.loginStudent = async (req, res) => {
         `;
         await connection.query(createLoginLogsTableQuery);
 
-        // Ensure studntlogs table exists
-        const createstudntlogsTableQuery = `
+        // Ensure studentlogs table exists
+        const createstudentlogsTableQuery = `
             CREATE TABLE IF NOT EXISTS studentlogs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 student_id VARCHAR(255) NOT NULL,
@@ -47,7 +47,7 @@ exports.loginStudent = async (req, res) => {
                 UNIQUE (student_id)
             )
         `;
-        await connection.query(createstudntlogsTableQuery);
+        await connection.query(createstudentlogsTableQuery);
 
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
@@ -85,12 +85,12 @@ exports.loginStudent = async (req, res) => {
                 await connection.query(insertLogQuery, [userId, loginTime, ipAddress, diskIdentifier, macAddress]);
 
                 // Insert or update student login details
-                const insertstudntlogsQuery = `
-                    INSERT INTO studntlogs (student_id, center, loginTime, login)
+                const insertstudentlogsQuery = `
+                    INSERT INTO studentlogs (student_id, center, loginTime, login)
                     VALUES (?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE loginTime = ?, login = ?
                 `;
-                await connection.query(insertstudntlogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
+                await connection.query(insertstudentlogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
 
                 res.send('Logged in successfully as a student!');
             } else {
@@ -138,7 +138,7 @@ exports.updateAudioLogTime = async (req, res) => {
 
     try {
         const updateAudioLogQuery = `
-            UPDATE studntlogs
+            UPDATE studentlogs
             SET ${columnName} = ?
             WHERE student_id = ?
         `;
@@ -185,7 +185,7 @@ exports.updatePassagewLogTime = async (req, res) => {
 
     try {
         const updateAudioLogQuery = `
-            UPDATE studntlogs
+            UPDATE studentlogs
             SET ${columnName} = ?
             WHERE student_id = ?
         `;
