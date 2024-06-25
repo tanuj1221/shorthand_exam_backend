@@ -1,5 +1,7 @@
 const connection = require('../../config/db1');
 exports.getAudioLogs = async (req, res) => {
+
+    console.log("running getAudioLogs...")
     const studentId = req.params.studentId;
     const studentBody = req.body;
 

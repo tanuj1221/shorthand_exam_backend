@@ -48,11 +48,11 @@ exports.getStudentsTrack = async (req, res) => {
 
     if (examCenterCode && examCenterCode !=0 && batchNo) {
         //query = queryExamCenterCodeBatchNo;
-        query += ' WHERE students.examCenterCode = ? AND students.batchNo = ?;'
+        query += ' WHERE students.center = ? AND students.batchNo = ?;'
         queryParams.push(examCenterCode, batchNo);
     } else if (examCenterCode && examCenterCode!=0) {
         //query = queryExamCenterCode;
-        query += ' WHERE students.examCenterCode = ?;'
+        query += ' WHERE students.center = ?;'
         queryParams.push(examCenterCode);
     } else if (examCenterCode==0 && batchNo) {
         //query = queryBatchNo;

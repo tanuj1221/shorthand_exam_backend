@@ -11,13 +11,4 @@ const upload = multer({ dest: 'uploads/' });
 
 router.post('/importcsv/:tableName',upload.single('csvFilePath'), csvController.importCSV);
 
-<<<<<<< HEAD
 module.exports = router;
-=======
-
-  
-  
-
-module.exports = router;  
-  
->>>>>>> upstream/shubh
