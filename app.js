@@ -15,12 +15,13 @@ const pingMeRoutes = require('./routes/pingMe')
 const trackStudentRoutes = require('./routes/track-students-route')
 const examCenterAdminRoutes = require('./routes/exam_center_admin')
 const examCenterDataRoutes = require('./routes/examCenterRoutes')
+const superAdminRoutes = require('./routes/superAdmin_updateDb')
 
 const app = express();
 const PORT = 3000;
 
 app.use(cors({
-  origin: 'http://shorthandonlineexam.in:3001',
+  origin: 'http://localhost:3001',
   credentials: true
 }));
 
@@ -41,9 +42,6 @@ app.use(session({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-
-
-
 app.use(examCenterRoutes)
 app.use(dataInputRoutes)
 app.use(studentRoutes)
@@ -53,14 +51,15 @@ app.use(pingMeRoutes)
 app.use(trackStudentRoutes)
 app.use(examCenterAdminRoutes)
 app.use(examCenterDataRoutes)
+app.use(superAdminRoutes)
 
 app.use(express.static(path.join(__dirname, 'build'))); // 'build' is the default directory for create-react-app builds
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
+// app.get('*', (req, res) => {
+//     res.sendFile(path.join(__dirname, 'build', 'index.html'));
+// });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://shorthandonlineexam.in:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
   });
   
