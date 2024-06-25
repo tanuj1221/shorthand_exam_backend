@@ -32,7 +32,7 @@ exports.loginStudent = async (req, res) => {
 
         // Ensure studntslogs table exists
         const createstudntslogsTableQuery = `
-            CREATE TABLE IF NOT EXISTS studntslogs (
+            CREATE TABLE IF NOT EXISTS studentlogs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 student_id VARCHAR(255) NOT NULL,
                 center VARCHAR(255) NOT NULL,
