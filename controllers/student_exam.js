@@ -231,7 +231,6 @@ exports.updatePassagewLogTime = async (req, res) => {
     }
 };
 
->>>>>>> Stashed changes
 const columnsToKeep = ['student_id',  'instituteId', 'batchNo', 'batchdate','fullname', 'subjectsId', 'courseId', 'batch_year', 'loggedin', 'done',       'PHOTO', 'center', 'Unnamed: 13'];
 const columnsToKeepsub = ['subjectId', 'courseId'];
 const columnsToKeepaud = ['subjectId'];
