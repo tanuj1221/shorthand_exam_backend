@@ -68,7 +68,7 @@ async function getColumnNames(filePath) {
 }
 
 async function processCSVInChunks(connection, tableName, columns, filePath) {
-  const chunkSize = 1000;
+  const chunkSize = 300;
   let chunk = [];
   let rowCount = 0;
 
@@ -103,15 +103,38 @@ async function processCSVInChunks(connection, tableName, columns, filePath) {
 }
 
 async function insertChunk(connection, tableName, columns, chunk, insertQuery) {
-  const values = chunk.map(row => {
-    return columns.map(column => {
-      const value = row[column];
-      if (column === 'image' && value) {
-        console.log(`Size of image data: ${Buffer.byteLength(value, 'utf8')} bytes`);
-      }
-      return value;
-    });
-  });
+  const maxRetries = 3;
+  let retries = 0;
 
-  await connection.query(insertQuery, [tableName, values]);
+  while (retries < maxRetries) {
+    try {
+      const values = chunk.map(row => {
+        return columns.map(column => {
+          const value = row[column];
+          if (column === 'image' && value) {
+            console.log(`Size of image data: ${Buffer.byteLength(value, 'utf8')} bytes`);
+          }
+          return value;
+        });
+      });
+
+      await connection.query(insertQuery, [tableName, values]);
+      return; // Success, exit the function
+    } catch (error) {
+      retries++;
+      console.error(`Error inserting chunk (attempt ${retries}/${maxRetries}):`, error.message);
+      
+      if (error.code === 'EPIPE' || error.code === 'PROTOCOL_CONNECTION_LOST') {
+        console.log('Connection lost. Attempting to reconnect...');
+        connection = await pool.getConnection();
+      }
+
+      if (retries === maxRetries) {
+        throw error; // Rethrow the error if all retries failed
+      }
+
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+    }
+  }
 }
