@@ -298,11 +298,12 @@ exports.getStudentDetails = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
+
 exports.getaudios = async (req, res) => {
     const studentId = req.session.studentId;
     const studentQuery = 'SELECT * FROM students WHERE student_id = ?';
     const subjectsQuery = 'SELECT * FROM subjectdb WHERE subjectId = ?';
-    const audioQuery = 'SELECT * FROM audiodb WHERE subjectId = ? AND qset = ?';
+    const audioQuery = 'SELECT * FROM audiodb WHERE subjectId = ?';
 
     try {
         const [students] = await connection.query(studentQuery, [studentId]);
@@ -321,6 +322,8 @@ exports.getaudios = async (req, res) => {
             }
         }
 
+
+
         // Extract subjectsId and parse it to an array
         const subjectsId = JSON.parse(student.subjectsId);
 
@@ -332,14 +335,13 @@ exports.getaudios = async (req, res) => {
         }
         const subject = subjects[0];
 
-        // Fetch the qset from the student table
-        const qset = student.qset;
 
-        const [audios] = await connection.query(audioQuery, [subjectId, qset]);
-        if (audios.length === 0) {
-            return res.status(404).send('Audio not found');
+        const [auidos] = await connection.query(audioQuery, [subjectId]);
+        if (auidos.length === 0) {
+            return res.status(404).send('audio not found');
         }
-        const audio = audios[0];
+        const audio = auidos[0];
+
 
         const responseData = {
             subjectId: subject.subjectId,
@@ -353,7 +355,7 @@ exports.getaudios = async (req, res) => {
             passage1: audio.passage1,
             audio2: audio.audio2,
             passage2: audio.passage2,
-            testaudio: audio.testaudio
+            testaudio:audio.testaudio
         };
         const encryptedResponseData = {};
         for (let key in responseData) {
