@@ -21,7 +21,7 @@ const app = express();
 const PORT = 3000;
 
 app.use(cors({
-  origin: 'http://localhost:3001',
+  origin: 'http://shorthandonlineexam.in:3001',
   credentials: true
 }));
 
@@ -55,11 +55,11 @@ app.use(superAdminRoutes)
 
 app.use(express.static(path.join(__dirname, 'build'))); // 'build' is the default directory for create-react-app builds
 
-// app.get('*', (req, res) => {
-//     res.sendFile(path.join(__dirname, 'build', 'index.html'));
-// });
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://shorthandonlineexam.in:${PORT}`);
   });
   
