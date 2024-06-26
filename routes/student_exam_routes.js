@@ -22,7 +22,7 @@ router.get('/audioProgress', isAuthenticated,studentController.getAudioLogs);
 router.post('/textlogs', isAuthenticated,studentController.logTextInput); 
 router.post('/passageprogress', isAuthenticated,studentController.getPassageProgress); 
 router.post('/audiotime', isAuthenticated,studentController.updateAudioLogTime);
-router.post('/passagetime', isAuthenticated,studentController.updatePassagewLogTime); 
+
 
 
 
