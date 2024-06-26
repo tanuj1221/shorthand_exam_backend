@@ -136,8 +136,7 @@ exports.loginStudent = async (req, res) => {
         res.status(500).send('Internal server error');
     }
 };
-<<<<<<< Updated upstream
-=======
+
 
 exports.updateAudioLogTime = async (req, res) => {
     const { audioType } = req.body;
