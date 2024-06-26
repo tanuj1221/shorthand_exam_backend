@@ -21,7 +21,7 @@ exports.loginadmin= async (req, res) => {
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
             const admin = results[0];
-            console.log("data: "+admin);
+            console.log(admin);
             let decryptedStoredPassword;
             try {
                 decryptedStoredPassword = decrypt(admin.password);
@@ -95,5 +95,3 @@ exports.resetAllAudioLogs = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
-
-

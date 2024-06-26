@@ -850,6 +850,10 @@ exports.getcontrollerpass = async (req, res) => {
 
         res.send(encryptedResponseData)
 
+
+
+
+
     } catch (err) {
         console.error('Failed to fetch student details:', err);
         res.status(500).send(err.message);

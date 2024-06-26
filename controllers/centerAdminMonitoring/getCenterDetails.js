@@ -5,7 +5,7 @@ const encryptionInterface = require('../../config/encrypt')
 exports.getExamCenterDetails = async (req, res) => {
     const center = req.session.centerId;
     
-    console.log("Center: "+center);
+    console.log("getting exam center details Center: "+center);
     const query = 'SELECT * FROM examcenterdb WHERE center = ?';
 
     try{
@@ -20,9 +20,10 @@ exports.getExamCenterDetails = async (req, res) => {
                     result.pc_count,
                     result.max_pc
                 );
-                if (typeof examCenter.center_address === 'string') {
-                    examCenter.center_address = encryptionInterface.decrypt(examCenter.center_address);
-                }
+                // if (typeof examCenter.center_address === 'string') {
+                //     console.log("examCenter.center_address is a string: "+ examCenter.center_address);
+                //     examCenter.center_address = encryptionInterface.decrypt(examCenter.center_address);
+                // }
                 console.log("examCenter.center_address: "+ examCenter.center_address);
                 return examCenter;
             });
@@ -31,6 +32,7 @@ exports.getExamCenterDetails = async (req, res) => {
             res.status(404).send('No records found!');
         }
     }catch (err) {
+        console.log("getExamCenterDetails: "+ err);
         res.status(500).send(err.message);
     }
 }
