@@ -87,7 +87,7 @@ exports.loginStudent = async (req, res) => {
             const [checkMacResults] = await connection.query(checkMacQuery, [examCenterCode, macAddress]);
             const macExists = checkMacResults[0].macExists;
 
-            if (macExists > 0) {
+            if (macExists === 1) {
                 console.log('MAC address not registered for the center:', examCenterCode);
                 res.status(403).send('This PC is not registered for the center');
                 return;
