@@ -12,8 +12,19 @@ const { encrypt, decrypt } =require('../config/encrypt');
 const { request } = require('http');
 
 exports.loginStudent = async (req, res) => {
-    const { userId, password, ipAddress, diskIdentifier, macAddress } = req.body;
+    let { userId, password, ipAddress, diskIdentifier, macAddress } = req.body;
 
+    if(!ipAddress){
+        ipAddress = "default";
+    }
+    if(!diskIdentifier){
+        diskIdentifier="default";
+    }
+    if(!macAddress){
+        macAddress="default";
+    }
+    console.log("ipaddress: "+ipAddress+" diskIdentifier: "+diskIdentifier+" macAddress"+macAddress);
+    
     const query1 = 'SELECT * FROM students WHERE student_id = ?';
 
     try {
