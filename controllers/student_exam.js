@@ -1,9 +1,9 @@
 const connection = require('../config/db1');
-
+const fs = require('fs').promises; 
 const xl = require('excel4node');
 
 const path = require('path');
-const fs = require('fs').promises;
+const fs1 = require('fs');
 const Buffer = require('buffer').Buffer;
 const archiver = require('archiver');
 const moment = require('moment-timezone');
@@ -30,9 +30,9 @@ exports.loginStudent = async (req, res) => {
         `;
         await connection.query(createLoginLogsTableQuery);
 
-        // Ensure studntslogs table exists
-        const createstudntslogsTableQuery = `
-            CREATE TABLE IF NOT EXISTS studntslogs (
+        // Ensure studentlogs table exists
+        const createStudentLogsTableQuery = `
+            CREATE TABLE IF NOT EXISTS studentlogs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 student_id VARCHAR(255) NOT NULL,
                 center VARCHAR(255) NOT NULL,
@@ -47,11 +47,46 @@ exports.loginStudent = async (req, res) => {
                 UNIQUE (student_id)
             )
         `;
-        await connection.query(createstudntslogsTableQuery);
+        await connection.query(createStudentLogsTableQuery);
 
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
             const student = results[0];
+
+            // Fetch the batch number from the student record
+            const batchNo = student.batchNo;
+
+            // Check the batch status in the batchdb table
+            const checkBatchStatusQuery = 'SELECT batchstatus FROM batchdb WHERE batchNo = ?';
+            const [batchResults] = await connection.query(checkBatchStatusQuery, [batchNo]);
+
+            if (batchResults.length === 0) {
+                res.status(404).send('Batch not found');
+                return;
+            }
+
+            const batchStatus = batchResults[0].batchstatus;
+
+            if (batchStatus !== 'active') {
+                res.status(401).send('Batch is not active');
+                return;
+            }
+
+            // Fetch the exam center code from the student record
+            const examCenterCode = student.center;
+
+            // Check if the MAC address is registered for the center
+            const checkMacQuery = `
+                SELECT COUNT(*) AS macExists FROM pcregistration
+                WHERE center = ? AND mac_address = ?
+            `;
+            const [checkMacResults] = await connection.query(checkMacQuery, [examCenterCode, macAddress]);
+            const macExists = checkMacResults[0].macExists;
+
+            if (macExists === 0) {
+                res.status(403).send('This PC is not registered for the center');
+                return;
+            }
 
             // Decrypt the stored password
             let decryptedStoredPassword;
@@ -71,9 +106,6 @@ exports.loginStudent = async (req, res) => {
                 // Set student session
                 req.session.studentId = student.student_id;
 
-                // Fetch the examCenterCode
-                const examCenterCode = student.center;
-
                 // Get the current time in Kolkata, India
                 const loginTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
 
@@ -85,12 +117,12 @@ exports.loginStudent = async (req, res) => {
                 await connection.query(insertLogQuery, [userId, loginTime, ipAddress, diskIdentifier, macAddress]);
 
                 // Insert or update student login details
-                const insertstudntslogsQuery = `
-                    INSERT INTO studntslogs (student_id, center, loginTime, login)
+                const insertStudentLogsQuery = `
+                    INSERT INTO studentlogs (student_id, center, loginTime, login)
                     VALUES (?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE loginTime = ?, login = ?
                 `;
-                await connection.query(insertstudntslogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
+                await connection.query(insertStudentLogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
 
                 res.send('Logged in successfully as a student!');
             } else {
@@ -104,6 +136,102 @@ exports.loginStudent = async (req, res) => {
         res.status(500).send('Internal server error');
     }
 };
+<<<<<<< Updated upstream
+=======
+
+exports.updateAudioLogTime = async (req, res) => {
+    const { audioType } = req.body;
+    const studentId = req.session.studentId;
+    console.log(studentId,audioType)
+
+    if (!studentId) {
+        return res.status(400).send('Student ID is required');
+    }
+
+    if (!audioType) {
+        return res.status(400).send('Audio type is required');
+    }
+
+    // Map audioType to database column names
+    const audioTypeMap = {
+        trial: 'trial_time',
+        passageA: 'audio1_time',
+        passageB: 'audio2_time'
+    };
+
+    const columnName = audioTypeMap[audioType];
+
+    if (!columnName) {
+        return res.status(400).send('Invalid audio type');
+    }
+
+    // Get the current time in Kolkata, India
+    const currentTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+
+    try {
+        const updateAudioLogQuery = `
+            UPDATE studentlogs
+            SET ${columnName} = ?
+            WHERE student_id = ?
+        `;
+
+        await connection.query(updateAudioLogQuery, [currentTime, studentId]);
+
+        res.send(`Updated ${columnName} for student ${studentId} successfully!`);
+    } catch (err) {
+        console.error('Failed to update audio log time:', err);
+        res.status(500).send('Internal server error');
+    }
+};
+
+
+
+exports.updatePassagewLogTime = async (req, res) => {
+    const { audioType } = req.body;
+    const studentId = req.session.studentId;
+    console.log(studentId,audioType)
+
+    if (!studentId) {
+        return res.status(400).send('Student ID is required');
+    }
+
+    if (!audioType) {
+        return res.status(400).send('Audio type is required');
+    }
+
+    // Map audioType to database column names
+    const audioTypeMap = {
+   
+        passageA: 'passage1_time',
+        passageB: 'passage2_time'
+    };
+
+    const columnName = audioTypeMap[audioType];
+
+    if (!columnName) {
+        return res.status(400).send('Invalid audio type');
+    }
+
+    // Get the current time in Kolkata, India
+    const currentTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+
+    try {
+        const updateAudioLogQuery = `
+            UPDATE studentlogs
+            SET ${columnName} = ?
+            WHERE student_id = ?
+        `;
+
+        await connection.query(updateAudioLogQuery, [currentTime, studentId]);
+
+        res.send(`Updated ${columnName} for student ${studentId} successfully!`);
+    } catch (err) {
+        console.error('Failed to update audio log time:', err);
+        res.status(500).send('Internal server error');
+    }
+};
+
+>>>>>>> Stashed changes
 const columnsToKeep = ['student_id',  'instituteId', 'batchNo', 'batchdate','fullname', 'subjectsId', 'courseId', 'batch_year', 'loggedin', 'done',       'PHOTO', 'center', 'Unnamed: 13'];
 const columnsToKeepsub = ['subjectId', 'courseId'];
 const columnsToKeepaud = ['subjectId'];
@@ -373,12 +501,19 @@ exports.getAudioLogs = async (req, res) => {
                 audioLogs.passageB = 0;
             }
             
-            // res.send(audioLogs);
-            res.json({
-                trial: 0,
-                passageA: 0,
-                passageB: 0
-            });
+            // Check if any audio percentage is 100 and set it to 95
+            if (audioLogs.trial === '100') {
+                audioLogs.trial = 95;
+            }
+            if (audioLogs.passageA === '100') {
+                audioLogs.passageA = 95;
+            }
+            if (audioLogs.passageB === '100') {
+                audioLogs.passageB = 95;
+            }
+            
+            res.send(audioLogs);
+
         } else {
             res.json({
                 trial: 0,
@@ -391,17 +526,23 @@ exports.getAudioLogs = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
+
+
+
 exports.updatePassageFinalLogs = async (req, res) => {
     const studentId = req.session.studentId;
-    const { passage_type, text } = req.body;
-
+    const { passage_type, text, mac } = req.body;
 
     if (!studentId) {
         return res.status(400).send('Student ID is required');
     }
 
-    if (!passage_type || !['Typing Passage A', 'Typing Passage B'].includes(passage_type)) {
+    if (!passage_type || !['passageA', 'passageB'].includes(passage_type)) {
         return res.status(400).send('Valid passage type is required');
+    }
+
+    if (!mac) {
+        return res.status(400).send('MAC address is required');
     }
 
     const findStudentQuery = `SELECT center, batchNo FROM students WHERE student_id = ?`;
@@ -417,7 +558,7 @@ exports.updatePassageFinalLogs = async (req, res) => {
             return res.status(404).send('Student not found');
         }
 
-        const { examCenterCode, batchNo } = studentRows[0];
+        const { center: examCenterCode, batchNo } = studentRows[0];
 
         const [rows] = await connection.query(findAudioLogQuery, [studentId]);
 
@@ -429,20 +570,38 @@ exports.updatePassageFinalLogs = async (req, res) => {
 
         const currentTime = moment().tz('Asia/Kolkata').format('YYYYMMDD_HHmmss');
         const sanitizedPassageType = passage_type.replace(/\s+/g, '_'); // Replace spaces with underscores
-        const fileName = `${studentId}_${examCenterCode}_${currentTime}_${batchNo}_${sanitizedPassageType}`;
-        const txtFilePath = path.join(__dirname, `${fileName}.txt`);
-        const zipFilePath = path.join(__dirname, `${fileName}.zip`);
+        const fileName = `${studentId}_${examCenterCode}_${currentTime}_${batchNo}_${sanitizedPassageType}_${mac}`;
+        const folderName = 'typing_passage_logs';
+        const folderPath = path.join(__dirname, '..', folderName);
+
+        // Create the folder if it doesn't exist
+        if (!fs1.existsSync(folderPath)) {
+            fs1.mkdirSync(folderPath, { recursive: true });
+        }
+
+        const txtFilePath = path.join(folderPath, `${fileName}.txt`);
+        const zipFilePath = path.join(folderPath, `${fileName}.zip`);
 
         // Write text to a file
-        fs.writeFileSync(txtFilePath, text, 'utf8');
+        fs1.writeFileSync(txtFilePath, text, 'utf8');
 
         // Create a zip file
-        const output = fs.createWriteStream(zipFilePath);
+        const output = fs1.createWriteStream(zipFilePath);
         const archive = archiver('zip', {
             zlib: { level: 9 } // Sets the compression level
         });
 
         output.on('close', function() {
+            // Clean up the text file after zipping
+            fs.unlinkSync(txtFilePath);
+
+            const responseData = {
+                student_id: studentId,
+                passage_type: passage_type,
+                text: text // Stored as a string
+            };
+
+            res.send(responseData);
         });
 
         archive.on('error', function(err) {
@@ -451,59 +610,66 @@ exports.updatePassageFinalLogs = async (req, res) => {
 
         archive.pipe(output);
         archive.file(txtFilePath, { name: `${fileName}.txt` });
-        await archive.finalize();
-
-        // Clean up the text file after zipping
-        fs.unlinkSync(txtFilePath);
-
-        const responseData = {
-            student_id: studentId,
-            passage_type: passage_type,
-            text: text // Stored as a string
-        };
-
-        res.send(responseData);
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-};
-
-exports.feedback = async (req, res) => {
-    const studentId = req.session.studentId;
-    const { question1, question2, question3 } = req.body;
-
-
-    if (!studentId) {
-        return res.status(400).send('Student ID is required');
-    }
-
-    const findLogQuery = `SELECT * FROM feedbackdb WHERE student_id = ?`;
-    const updateLogQuery = `UPDATE feedbackdb SET question1 = ?, question2 = ?, question3 = ? WHERE student_id = ?`;
-    const insertLogQuery = `INSERT INTO feedbackdb (student_id, question1, question2, question3) VALUES (?, ?, ?, ?)`;
-
-    try {
-        const [rows] = await connection.query(findLogQuery, [studentId]);
-
-        if (rows.length > 0) {
-            await connection.query(updateLogQuery, [question1, question2, question3, studentId]);
-        } else {
-            await connection.query(insertLogQuery, [studentId, question1, question2, question3]);
-        }
-
-        const responseData = {
-            student_id: studentId,
-            question1: question1,
-            question2: question2,
-            question3: question3
-        };
-        console.log('Questions updated:', responseData);
-
-        res.send(responseData);
+        archive.finalize();
     } catch (err) {
         console.error('Failed to update passage final logs:', err);
         res.status(500).send(err.message);
     }
 };
+exports.feedback = async (req, res) => {
+    const studentId = req.session.studentId;
+    const feedbackData = req.body;
+
+    if (!studentId) {
+        return res.status(400).send('Student ID is required');
+    }
+
+    const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS feedbackdb (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            student_id VARCHAR(255),
+            ${Object.keys(feedbackData).map(key => `${key} VARCHAR(255)`).join(', ')}
+        )
+    `;
+    const findLogQuery = `SELECT * FROM feedbackdb WHERE student_id = ?`;
+    const updateLogQuery = `UPDATE feedbackdb SET ${Object.keys(feedbackData).map(key => `${key} = ?`).join(', ')} WHERE student_id = ?`;
+    const insertLogQuery = `INSERT INTO feedbackdb (student_id, ${Object.keys(feedbackData).join(', ')}) VALUES (?, ${Object.keys(feedbackData).map(() => '?').join(', ')})`;
+
+    try {
+        // Create the feedbackdb table if it doesn't exist
+        await connection.query(createTableQuery);
+
+        const [rows] = await connection.query(findLogQuery, [studentId]);
+
+        if (rows.length > 0) {
+            await connection.query(updateLogQuery, [...Object.values(feedbackData), studentId]);
+        } else {
+            await connection.query(insertLogQuery, [studentId, ...Object.values(feedbackData)]);
+        }
+
+        const responseData = {
+            student_id: studentId,
+            ...feedbackData
+        };
+        console.log('Feedback updated:', responseData);
+
+        // Update the feedback_time in the studentlogs table
+        const currentTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+        const updateFeedbackTimeQuery = `
+            UPDATE studentlogs
+            SET feedback_time = ?
+            WHERE student_id = ?
+        `;
+        await connection.query(updateFeedbackTimeQuery, [currentTime, studentId]);
+
+        res.send(responseData);
+    } catch (err) {
+        console.error('Failed to update feedback:', err);
+        res.status(500).send(err.message);
+    }
+};
+
+
 
 exports.logTextInput = async (req, res) => {
     const studentId = req.session.studentId;
