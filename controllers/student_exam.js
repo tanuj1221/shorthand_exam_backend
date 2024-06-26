@@ -10,7 +10,6 @@ const moment = require('moment-timezone');
 
 const { encrypt, decrypt } =require('../config/encrypt');
 const { request } = require('http');
-
 exports.loginStudent = async (req, res) => {
     const { userId, password, ipAddress, diskIdentifier, macAddress } = req.body;
 
@@ -61,6 +60,7 @@ exports.loginStudent = async (req, res) => {
             const [batchResults] = await connection.query(checkBatchStatusQuery, [batchNo]);
 
             if (batchResults.length === 0) {
+                console.log(`Error: Batch not found for batchNo ${batchNo}`);
                 res.status(404).send('Batch not found');
                 return;
             }
@@ -68,6 +68,7 @@ exports.loginStudent = async (req, res) => {
             const batchStatus = batchResults[0].batchstatus;
 
             if (batchStatus !== 'active') {
+                console.log(`Error: Batch ${batchNo} is not active. Current status: ${batchStatus}`);
                 res.status(401).send('Batch is not active');
                 return;
             }
@@ -87,7 +88,9 @@ exports.loginStudent = async (req, res) => {
 
             // Ensure both passwords are treated as strings
             const decryptedStoredPasswordStr = String(decryptedStoredPassword).trim();
+            
             const providedPasswordStr = String(password).trim();
+            console.log(decryptedStoredPasswordStr,providedPasswordStr)
 
             if (decryptedStoredPasswordStr === providedPasswordStr) {
                 // Set student session
@@ -113,9 +116,11 @@ exports.loginStudent = async (req, res) => {
 
                 res.send('Logged in successfully as a student!');
             } else {
+                console.log(`Error: Invalid credentials for student ${userId}`);
                 res.status(401).send('Invalid credentials for student');
             }
         } else {
+            console.log(`Error: Student not found with ID ${userId}`);
             res.status(404).send('Student not found');
         }
     } catch (err) {
@@ -123,7 +128,6 @@ exports.loginStudent = async (req, res) => {
         res.status(500).send('Internal server error');
     }
 };
-
 exports.updateAudioLogTime = async (req, res) => {
     const { audioType } = req.body;
     const studentId = req.session.studentId;
@@ -216,21 +220,14 @@ exports.updatePassagewLogTime = async (req, res) => {
     }
 };
 
-const columnsToKeep = ['student_id',  'instituteId', 'batchNo', 'batchdate',
+const columnsToKeep = ['student_id', 'instituteId', 'batchNo', 'batchdate',
     'fullname', 'subjectsId', 'courseId', 'batch_year', 'loggedin', 'done',
     'PHOTO', 'center', 'reporting_Time', 'start_time', 'end_time', 'DAY',
-    'qset']
+    'qset', 'base64']
 
-const columnsToKeepsub =['subjectId', 'courseId', 'subject_name', 'subject_name_short',
-    'Daily_Timer', 'Passage_Timer', 'Demo_Timer']
-const columnsToKeepaud = ['subjectId', 'qset', 'code_a', 'code_b', 'code_t', 'audio1', 'passage1',
-    'audio2', 'passage2', 'testaudio']
-const columnsToKeepcontroller =  ['center', 'batchNo', 'controller_code', 'controller_name',
-    'controller_contact', 'controller_email', 
-    'district']
-const columnsToKeepcenter =  ['center',  'center_name', 'center_address', 'pc_count',
-    'max_pc', 'attendanceroll', 'absenteereport', 'answersheet',
-    'blankanswersheet']
+    
+
+
 exports.getStudentDetails = async (req, res) => {
     // Assuming studentId is stored in the session
     const studentId = req.session.studentId;
@@ -249,16 +246,6 @@ exports.getStudentDetails = async (req, res) => {
         // Decrypt the encrypted fields
 
         // Decrypt the encrypted fields
-        for (const field in student) {
-            if (student.hasOwnProperty(field) && !columnsToKeep.includes(field)) {
-                try {
-                    student[field] = decrypt(student[field]);
-                } catch (err) {
-                    console.error(`Failed to decrypt field ${field}:`, err);
-                    throw new Error(`Failed to decrypt field ${field}`);
-                }
-            }
-        }
 
         // Extract subjectsId and parse it to an array
         let subjectsId;
@@ -278,35 +265,16 @@ exports.getStudentDetails = async (req, res) => {
             return res.status(404).send('Subject not found');
         }
         const subject = subjects[0];
-        for (const field in subject) {
-            if (subject.hasOwnProperty(field) && !columnsToKeepsub.includes(field)) {
-                try {
-                    subject[field] = decrypt(subject[field]);
-                } catch (err) {
-                    console.error(`Failed to decrypt field ${field}:`, err);
-                    throw new Error(`Failed to decrypt field ${field}`);
-                }
-            }
-        }
 
-        // Encode photo to base64 string
-        const photoPath = path.join(__dirname, 'compressed', student.PHOTO); // Correct the folder name if needed
-        let photoBase64;
-        try {
-            const photoData = await fs.readFile(photoPath, { encoding: 'base64' });
-            photoBase64 = photoData;
-        } catch (err) {
-            console.error('Failed to read photo file:', err);
-            return res.status(500).send('Failed to read photo file');
-        }
+
 
         // Combine data by spreading student and subject objects
         const responseData = {
             ...student,
             ...subject, // Spread the subject properties into the main object
-            photo: photoBase64 // Base64 encoded photo string
+            photo: student.base64 // Base64 encoded photo string
         };
-
+      
         // Encrypt all fields in responseData
         const encryptedResponseData = {};
         for (let key in responseData) {
@@ -357,16 +325,6 @@ exports.getaudios = async (req, res) => {
             return res.status(404).send('Subject not found');
         }
         const subject = subjects[0];
-        for (const field in subject) {
-            if (subject.hasOwnProperty(field) && !columnsToKeepsub.includes(field)) {
-                try {
-                    subject[field] = decrypt(subject[field]);
-                } catch (err) {
-                    console.error(`Failed to decrypt field ${field}:`, err);
-                    throw new Error(`Failed to decrypt field ${field}`);
-                }
-            }
-        }
 
 
         const [auidos] = await connection.query(audioQuery, [subjectId]);
@@ -374,16 +332,6 @@ exports.getaudios = async (req, res) => {
             return res.status(404).send('audio not found');
         }
         const audio = auidos[0];
-        for (const field in audio) {
-            if (audio.hasOwnProperty(field) && !columnsToKeepaud.includes(field)) {
-                try {
-                    audio[field] = decrypt(audio[field]);
-                } catch (err) {
-                    console.error(`Failed to decrypt field ${field}:`, err);
-                    throw new Error(`Failed to decrypt field ${field}`);
-                }
-            }
-        }
 
 
         const responseData = {
@@ -587,7 +535,7 @@ exports.updatePassageFinalLogs = async (req, res) => {
 
         output.on('close', function() {
             // Clean up the text file after zipping
-            fs.unlinkSync(txtFilePath);
+            fs1.unlinkSync(txtFilePath);
 
             const responseData = {
                 student_id: studentId,
@@ -775,8 +723,7 @@ exports.logTextInput = async (req, res) => {
       res.status(500).send(err.message);
     }
   };
-
-exports.getcontrollerpass = async (req, res) => {
+  exports.getcontrollerpass = async (req, res) => {
     const studentId = req.session.studentId;
     const studentQuery = 'SELECT center FROM students WHERE student_id = ?';
     const centersQuery = 'SELECT * FROM examcenterdb WHERE center = ?';
@@ -785,73 +732,63 @@ exports.getcontrollerpass = async (req, res) => {
     try {
         const [students] = await connection.query(studentQuery, [studentId]);
         if (students.length === 0) {
+            console.log(`Error: Student not found for ID ${studentId}`);
             return res.status(404).send('Student not found');
         }
         const student = students[0];
-        const centrcode = student.center
+        const centrcode = student.center;
 
+        console.log(`Student center: ${centrcode}`);
 
         const [centers] = await connection.query(centersQuery, [centrcode]);
         if (centers.length === 0) {
+            console.log(`Error: Exam center not found for center code ${centrcode}`);
             return res.status(404).send('Subject not found');
         }
         const center1 = centers[0];
-        for (const field in center1) {
-            if (center1.hasOwnProperty(field) && !columnsToKeepcenter.includes(field)) {
-                try {
-                    center1[field] = decrypt(center1[field]);
-                } catch (err) {
-                    console.error(`Failed to decrypt field ${field}:`, err);
-                    throw new Error(`Failed to decrypt field ${field}`);
-                }
-            }
-        }
 
-
+        console.log(`Exam center found: ${center1.center_name}`);
 
         const [controllers] = await connection.query(controllersQuery, [centrcode]);
         if (controllers.length === 0) {
+            console.log(`Error: Controller not found for center code ${centrcode}`);
             return res.status(404).send('Subject not found');
         }
 
         const controllers1 = controllers[0];
-        let decryptedStoredPassword;
-        try {
-            decryptedStoredPassword = decrypt(controllers1.controller_pass);
-        } catch (error) {
-            res.status(500).send('Error decrypting stored password');
-            return;
-        }
 
         // Ensure both passwords are treated as strings
-        const decryptedStoredPasswordStr = String(decryptedStoredPassword).trim();
-  
-
+        const decryptedStoredPasswordStr = String(controllers1.controller_pass).trim();
         
-       
+        console.log(`Controller password length: ${decryptedStoredPasswordStr.length}`);
 
         const responseData = {
             center: center1.center,
-            controllerpass :decryptedStoredPasswordStr,
-            center_name : center1.center_name
-
+            controllerpass: decryptedStoredPasswordStr,
+            center_name: center1.center_name
         };
+
+        console.log('Response data before encryption:', responseData);
 
         const encryptedResponseData = {};
         for (let key in responseData) {
             if (responseData.hasOwnProperty(key)) {
-                encryptedResponseData[key] = encrypt(responseData[key].toString());
+                try {
+                    encryptedResponseData[key] = encrypt(responseData[key].toString());
+                } catch (encryptError) {
+                    console.log(`Error encrypting ${key}:`, encryptError);
+                    encryptedResponseData[key] = '';
+                }
             }
         }
 
-        res.send(encryptedResponseData)
+        console.log('Encrypted response data keys:', Object.keys(encryptedResponseData));
 
-
-
-
+        res.send(encryptedResponseData);
 
     } catch (err) {
         console.error('Failed to fetch student details:', err);
+        console.log('Error stack:', err.stack);
         res.status(500).send(err.message);
     }
 };
