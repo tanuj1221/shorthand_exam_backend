@@ -9,6 +9,11 @@ const isAuthenticatedAdmin = require('../middleware/isAuthAdmin')
 const upload = multer({ dest: 'uploads/' });
 
 
-router.post('/importcsv/:tableName', upload.single('csvFilePath'), csvController.importCSV);
+router.post('/importcsv/:tableName',upload.single('csvFilePath'), csvController.importCSV);
 
-module.exports = router;
+
+  
+  
+
+module.exports = router;  
+  

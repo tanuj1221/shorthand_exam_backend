@@ -75,19 +75,6 @@ exports.loginStudent = async (req, res) => {
             // Fetch the exam center code from the student record
             const examCenterCode = student.center;
 
-            // Check if the MAC address is registered for the center
-            const checkMacQuery = `
-                SELECT COUNT(*) AS macExists FROM pcregistration
-                WHERE center = ? AND mac_address = ?
-            `;
-            const [checkMacResults] = await connection.query(checkMacQuery, [examCenterCode, macAddress]);
-            const macExists = checkMacResults[0].macExists;
-
-            if (macExists === 0) {
-                res.status(403).send('This PC is not registered for the center');
-                return;
-            }
-
             // Decrypt the stored password
             let decryptedStoredPassword;
             try {
@@ -136,7 +123,6 @@ exports.loginStudent = async (req, res) => {
         res.status(500).send('Internal server error');
     }
 };
-
 
 exports.updateAudioLogTime = async (req, res) => {
     const { audioType } = req.body;
@@ -230,9 +216,9 @@ exports.updatePassagewLogTime = async (req, res) => {
     }
 };
 
-const columnsToKeep = ['student_id',  'instituteId', 'batchNo', 'batchdate','fullname', 'subjectsId', 'courseId', 'batch_year', 'loggedin', 'done',       'PHOTO', 'center', 'Unnamed: 13'];
+const columnsToKeep = ['student_id',  'instituteId', 'batchNo','qset', 'batchdate','fullname', 'subjectsId', 'courseId', 'batch_year', 'loggedin', 'done',       'PHOTO', 'center', 'Unnamed: 13'];
 const columnsToKeepsub = ['subjectId', 'courseId'];
-const columnsToKeepaud = ['subjectId'];
+const columnsToKeepaud = ['subjectId','qset'];
 const columnsToKeepcontroller = ['center', 'batchNo', 'controller_code', 'controller_name',   'controller_contact', 'controller_email',    'district'];
 const columnsToKeepcenter = ['center','center_name','center_name','pc_count','max_pc']
 exports.getStudentDetails = async (req, res) => {
