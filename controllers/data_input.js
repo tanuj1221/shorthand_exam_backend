@@ -16,62 +16,69 @@ exports.importCSV = async (req, res) => {
   }
 
   try {
-    const columns = await new Promise((resolve, reject) => {
-      const stream = fs.createReadStream(csvFilePath)
-        .pipe(fastCsv.parse({ headers: true }))
-        .on('error', reject)
-        .on('data', (row) => {
-          stream.pause();
-          resolve(Object.keys(row));
-          stream.destroy();
-        })
-        .on('end', () => {
-          reject(new Error('No data found in the CSV file'));
-        });
-    });
+    // Read the columns from the CSV if the table does not exist
+    let columns;
+    const tableExists = await tableAlreadyExists(tableName);
 
-    const createTableQuery = `CREATE TABLE IF NOT EXISTS ?? (
-      ${columns.map(column => `\`${column}\` LONGTEXT`).join(', ')}
-    )`;
+    if (!tableExists) {
+      columns = await new Promise((resolve, reject) => {
+        const stream = fs.createReadStream(csvFilePath)
+          .pipe(fastCsv.parse({ headers: true }))
+          .on('error', reject)
+          .on('data', (row) => {
+            stream.pause();
+            resolve(Object.keys(row));
+            stream.destroy();
+          })
+          .on('end', () => {
+            reject(new Error('No data found in the CSV file'));
+          });
+      });
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
+      const createTableQuery = `CREATE TABLE IF NOT EXISTS ?? (
+        ${columns.map(column => `\`${column}\` LONGTEXT`).join(', ')}
+      )`;
 
-    try {
-      await connection.query(createTableQuery, [tableName]);
-      await connection.query(`TRUNCATE TABLE ??`, [tableName]);
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
 
-      const stream = fs.createReadStream(csvFilePath)
-        .pipe(fastCsv.parse({ headers: true }))
-        .on('error', (error) => {
-          throw error;
-        });
-
-      const insertPromises = [];
-      const chunkSize = 1000;
-      let chunk = [];
-
-      for await (const row of stream) {
-        chunk.push(row);
-        if (chunk.length >= chunkSize) {
-          insertPromises.push(insertChunk(connection, tableName, columns, chunk));
-          chunk = [];
-        }
+      try {
+        await connection.query(createTableQuery, [tableName]);
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
       }
-
-      if (chunk.length > 0) {
-        insertPromises.push(insertChunk(connection, tableName, columns, chunk));
-      }
-
-      await Promise.all(insertPromises);
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
+    } else {
+      columns = await getTableColumns(tableName);
     }
 
+    // Insert data
+    const stream = fs.createReadStream(csvFilePath)
+      .pipe(fastCsv.parse({ headers: true }))
+      .on('error', (error) => {
+        throw error;
+      });
+
+    const insertPromises = [];
+    const chunkSize = 1000;
+    let chunk = [];
+
+    for await (const row of stream) {
+      chunk.push(row);
+      if (chunk.length >= chunkSize) {
+        insertPromises.push(insertChunk(tableName, columns, chunk));
+        chunk = [];
+      }
+    }
+
+    if (chunk.length > 0) {
+      insertPromises.push(insertChunk(tableName, columns, chunk));
+    }
+
+    await Promise.all(insertPromises);
     fs.unlinkSync(csvFilePath);
     res.json({ message: `CSV data imported into table '${tableName}' successfully` });
   } catch (error) {
@@ -81,7 +88,27 @@ exports.importCSV = async (req, res) => {
   }
 };
 
-async function insertChunk(connection, tableName, columns, chunk) {
+async function tableAlreadyExists(tableName) {
+  const connection = await pool.getConnection();
+  try {
+    const [results] = await connection.query('SHOW TABLES LIKE ?', [tableName]);
+    return results.length > 0;
+  } finally {
+    connection.release();
+  }
+}
+
+async function getTableColumns(tableName) {
+  const connection = await pool.getConnection();
+  try {
+    const [results] = await connection.query('SHOW COLUMNS FROM ??', [tableName]);
+    return results.map(result => result.Field);
+  } finally {
+    connection.release();
+  }
+}
+
+async function insertChunk(tableName, columns, chunk) {
   const insertQuery = `INSERT INTO ?? (${columns.map(column => `\`${column}\``).join(', ')}) VALUES ?`;
   const values = chunk.map(row => {
     const rowValues = columns.map(column => row[column]);
@@ -93,5 +120,11 @@ async function insertChunk(connection, tableName, columns, chunk) {
     });
     return rowValues;
   });
-  await connection.query(insertQuery, [tableName, values]);
-}  
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.query(insertQuery, [tableName, values]);
+  } finally {
+    connection.release();
+  }
+}
