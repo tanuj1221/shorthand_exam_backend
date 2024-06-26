@@ -413,6 +413,8 @@ exports.updateAudioLogs = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
+
+
 exports.getAudioLogs = async (req, res) => {
     const studentId = req.session.studentId;
     
@@ -511,7 +513,7 @@ exports.updatePassageFinalLogs = async (req, res) => {
         }
 
         const currentTime = moment().tz('Asia/Kolkata').format('YYYYMMDD_HHmmss');
-        const sanitizedPassageType = passage_type.replace(/\s+/g, '_'); // Replace spaces with underscores
+        const sanitizedPassageType = passage_type.replace(/\s+/g, '_');
         const fileName = `${studentId}_${examCenterCode}_${currentTime}_${batchNo}_${sanitizedPassageType}_${mac}`;
         const folderName = 'typing_passage_logs';
         const folderPath = path.join(__dirname, '..', folderName);
@@ -530,34 +532,50 @@ exports.updatePassageFinalLogs = async (req, res) => {
         // Create a zip file
         const output = fs1.createWriteStream(zipFilePath);
         const archive = archiver('zip', {
-            zlib: { level: 9 } // Sets the compression level
+            zlib: { level: 9 }
         });
 
         output.on('close', function() {
             // Clean up the text file after zipping
-            fs1.unlinkSync(txtFilePath);
+            try {
+                fs1.unlinkSync(txtFilePath);
+            } catch (unlinkErr) {
+                console.error('Failed to delete temporary text file:', unlinkErr);
+            }
 
             const responseData = {
                 student_id: studentId,
                 passage_type: passage_type,
-                text: text // Stored as a string
+                text: text
             };
 
             res.send(responseData);
         });
 
         archive.on('error', function(err) {
-            throw err;
+            console.error('Archiver error:', err);
+            // Don't throw the error, just log it
+        });
+
+        archive.on('warning', function(err) {
+            if (err.code === 'ENOENT') {
+                console.warn('Archiver warning:', err);
+            } else {
+                console.error('Archiver warning:', err);
+            }
         });
 
         archive.pipe(output);
         archive.file(txtFilePath, { name: `${fileName}.txt` });
         archive.finalize();
+
     } catch (err) {
         console.error('Failed to update passage final logs:', err);
-        res.status(500).send(err.message);
+        res.status(500).send('An error occurred while processing your request');
     }
 };
+
+
 exports.feedback = async (req, res) => {
     const studentId = req.session.studentId;
     const feedbackData = req.body;
