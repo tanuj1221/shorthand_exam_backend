@@ -30,8 +30,8 @@ exports.loginStudent = async (req, res) => {
         `;
         await connection.query(createLoginLogsTableQuery);
 
-        // Ensure studntslogs table exists
-        const createstudntslogsTableQuery = `
+        // Ensure studentlogs table exists
+        const createStudentLogsTableQuery = `
             CREATE TABLE IF NOT EXISTS studentlogs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 student_id VARCHAR(255) NOT NULL,
@@ -47,11 +47,46 @@ exports.loginStudent = async (req, res) => {
                 UNIQUE (student_id)
             )
         `;
-        await connection.query(createstudntslogsTableQuery);
+        await connection.query(createStudentLogsTableQuery);
 
         const [results] = await connection.query(query1, [userId]);
         if (results.length > 0) {
             const student = results[0];
+
+            // Fetch the batch number from the student record
+            const batchNo = student.batchNo;
+
+            // Check the batch status in the batchdb table
+            const checkBatchStatusQuery = 'SELECT batchstatus FROM batchdb WHERE batchNo = ?';
+            const [batchResults] = await connection.query(checkBatchStatusQuery, [batchNo]);
+
+            if (batchResults.length === 0) {
+                res.status(404).send('Batch not found');
+                return;
+            }
+
+            const batchStatus = batchResults[0].batchstatus;
+
+            if (batchStatus !== 'active') {
+                res.status(401).send('Batch is not active');
+                return;
+            }
+
+            // Fetch the exam center code from the student record
+            const examCenterCode = student.center;
+
+            // Check if the MAC address is registered for the center
+            const checkMacQuery = `
+                SELECT COUNT(*) AS macExists FROM pcregistration
+                WHERE center = ? AND mac_address = ?
+            `;
+            const [checkMacResults] = await connection.query(checkMacQuery, [examCenterCode, macAddress]);
+            const macExists = checkMacResults[0].macExists;
+
+            if (macExists === 0) {
+                res.status(403).send('This PC is not registered for the center');
+                return;
+            }
 
             // Decrypt the stored password
             let decryptedStoredPassword;
@@ -71,9 +106,6 @@ exports.loginStudent = async (req, res) => {
                 // Set student session
                 req.session.studentId = student.student_id;
 
-                // Fetch the examCenterCode
-                const examCenterCode = student.center;
-
                 // Get the current time in Kolkata, India
                 const loginTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
 
@@ -85,12 +117,12 @@ exports.loginStudent = async (req, res) => {
                 await connection.query(insertLogQuery, [userId, loginTime, ipAddress, diskIdentifier, macAddress]);
 
                 // Insert or update student login details
-                const insertstudntslogsQuery = `
+                const insertStudentLogsQuery = `
                     INSERT INTO studentlogs (student_id, center, loginTime, login)
                     VALUES (?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE loginTime = ?, login = ?
                 `;
-                await connection.query(insertstudntslogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
+                await connection.query(insertStudentLogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
 
                 res.send('Logged in successfully as a student!');
             } else {
@@ -104,7 +136,6 @@ exports.loginStudent = async (req, res) => {
         res.status(500).send('Internal server error');
     }
 };
-
 
 
 exports.updateAudioLogTime = async (req, res) => {
@@ -583,43 +614,60 @@ exports.updatePassageFinalLogs = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
-
 exports.feedback = async (req, res) => {
     const studentId = req.session.studentId;
-    const { question1, question2, question3 } = req.body;
-
+    const feedbackData = req.body;
 
     if (!studentId) {
         return res.status(400).send('Student ID is required');
     }
 
+    const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS feedbackdb (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            student_id VARCHAR(255),
+            ${Object.keys(feedbackData).map(key => `${key} VARCHAR(255)`).join(', ')}
+        )
+    `;
     const findLogQuery = `SELECT * FROM feedbackdb WHERE student_id = ?`;
-    const updateLogQuery = `UPDATE feedbackdb SET question1 = ?, question2 = ?, question3 = ? WHERE student_id = ?`;
-    const insertLogQuery = `INSERT INTO feedbackdb (student_id, question1, question2, question3) VALUES (?, ?, ?, ?)`;
+    const updateLogQuery = `UPDATE feedbackdb SET ${Object.keys(feedbackData).map(key => `${key} = ?`).join(', ')} WHERE student_id = ?`;
+    const insertLogQuery = `INSERT INTO feedbackdb (student_id, ${Object.keys(feedbackData).join(', ')}) VALUES (?, ${Object.keys(feedbackData).map(() => '?').join(', ')})`;
 
     try {
+        // Create the feedbackdb table if it doesn't exist
+        await connection.query(createTableQuery);
+
         const [rows] = await connection.query(findLogQuery, [studentId]);
 
         if (rows.length > 0) {
-            await connection.query(updateLogQuery, [question1, question2, question3, studentId]);
+            await connection.query(updateLogQuery, [...Object.values(feedbackData), studentId]);
         } else {
-            await connection.query(insertLogQuery, [studentId, question1, question2, question3]);
+            await connection.query(insertLogQuery, [studentId, ...Object.values(feedbackData)]);
         }
 
         const responseData = {
             student_id: studentId,
-            question1: question1,
-            question2: question2,
-            question3: question3
+            ...feedbackData
         };
-        console.log('Questions updated:', responseData);
+        console.log('Feedback updated:', responseData);
+
+        // Update the feedback_time in the studentlogs table
+        const currentTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+        const updateFeedbackTimeQuery = `
+            UPDATE studentlogs
+            SET feedback_time = ?
+            WHERE student_id = ?
+        `;
+        await connection.query(updateFeedbackTimeQuery, [currentTime, studentId]);
 
         res.send(responseData);
     } catch (err) {
-        console.error('Failed to update passage final logs:', err);
+        console.error('Failed to update feedback:', err);
         res.status(500).send(err.message);
     }
 };
+
+
 
 exports.logTextInput = async (req, res) => {
     const studentId = req.session.studentId;

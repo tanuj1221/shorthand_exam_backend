@@ -8,7 +8,7 @@ const isAuthenticatedAdmin = require('../middleware/isAuthAdmin')
 
 router.post('/admin_login',adminFunctionController.loginadmin);
 
-router.delete('/deletetable/:tableName',isAuthenticatedAdmin,  adminFunctionController.deleteTable);
+router.delete('/deletetable/:tableName',  adminFunctionController.deleteTable);
 
 
 router.get('/resetaudiologs',isAuthenticatedAdmin,adminFunctionController.resetAllAudioLogs)
