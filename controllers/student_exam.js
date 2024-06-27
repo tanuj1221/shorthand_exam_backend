@@ -303,7 +303,7 @@ exports.getaudios = async (req, res) => {
     const studentId = req.session.studentId;
     const studentQuery = 'SELECT * FROM students WHERE student_id = ?';
     const subjectsQuery = 'SELECT * FROM subjectdb WHERE subjectId = ?';
-    const audioQuery = 'SELECT * FROM audiodb WHERE subjectId = ?';
+    const audioQuery = "SELECT * FROM audiodb WHERE subjectId = ? AND qset = ?";
 
     try {
         const [students] = await connection.query(studentQuery, [studentId]);
@@ -321,11 +321,14 @@ exports.getaudios = async (req, res) => {
                 }
             }
         }
+    
 
 
 
         // Extract subjectsId and parse it to an array
         const subjectsId = JSON.parse(student.subjectsId);
+        const qset = student.qset
+        console.log(qset)
 
         // Assuming you want the first subject from the array
         const subjectId = subjectsId[0];
@@ -336,12 +339,12 @@ exports.getaudios = async (req, res) => {
         const subject = subjects[0];
 
 
-        const [auidos] = await connection.query(audioQuery, [subjectId]);
+        const [auidos] = await connection.query(audioQuery, [subjectId, qset]);
         if (auidos.length === 0) {
             return res.status(404).send('audio not found');
         }
         const audio = auidos[0];
-
+       
 
         const responseData = {
             subjectId: subject.subjectId,
@@ -355,8 +358,10 @@ exports.getaudios = async (req, res) => {
             passage1: audio.passage1,
             audio2: audio.audio2,
             passage2: audio.passage2,
-            testaudio:audio.testaudio
+            testaudio:audio.testaudio   
         };
+  
+
         const encryptedResponseData = {};
         for (let key in responseData) {
             if (responseData.hasOwnProperty(key)) {
@@ -764,6 +769,7 @@ exports.logTextInput = async (req, res) => {
         }
         const student = students[0];
         const centrcode = student.center;
+   
 
         console.log(`Student center: ${centrcode}`);
 
@@ -787,7 +793,7 @@ exports.logTextInput = async (req, res) => {
         // Ensure both passwords are treated as strings
         const decryptedStoredPasswordStr = String(controllers1.controller_pass).trim();
         
-        console.log(`Controller password length: ${decryptedStoredPasswordStr.length}`);
+        
 
         const responseData = {
             center: center1.center,
@@ -795,7 +801,7 @@ exports.logTextInput = async (req, res) => {
             center_name: center1.center_name
         };
 
-        console.log('Response data before encryption:', responseData);
+    
 
         const encryptedResponseData = {};
         for (let key in responseData) {
