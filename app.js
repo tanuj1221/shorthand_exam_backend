@@ -15,9 +15,18 @@ const studentRoutes = require('./routes/student_exam_routes')
 
 //shubh routes
 const pingMeRoutes = require('./routes/pingMe')
+const examCenterLoginDash = require('./routes/examCenterAuth-dashboard')
+const examCenterDetails = require('./routes/examCenterDetails-dashboard')
+const trackStudentRoutes = require('./routes/trackStudentRoute')
 
 const app = express();
 const PORT = 3000;
+
+app.use(cors({
+  origin: 'http://localhost:3001',
+  credentials: true
+}));
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(session({
@@ -44,6 +53,11 @@ app.use(pingMeRoutes)
 
 //super admin dashboard
 app.use(superAdminRoutes)
+
+//exam center admin dashboard
+app.use(examCenterLoginDash)
+app.use(examCenterDetails)
+app.use(trackStudentRoutes)
 
 // app.use(express.static(path.join(__dirname, 'build'))); // 'build' is the default directory for create-react-app builds
 

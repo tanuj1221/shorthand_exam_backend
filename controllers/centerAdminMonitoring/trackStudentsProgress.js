@@ -3,8 +3,8 @@ const StudentTrackDTO = require('../../dto/studentProgress');
 const encryptionInterface = require('../../config/encrypt');
 
 exports.getStudentsTrack = async (req, res) => {
-    const { examCenterCode, batchNo } = req.params;
-
+    const { batchNo } = req.params;
+    const examCenterCode = req.session.centerId;
     //console.log("exam center code: " + examCenterCode);
     //console.log("batch no: " + batchNo);
     
@@ -45,19 +45,20 @@ exports.getStudentsTrack = async (req, res) => {
             students.student_id = studentlogs.student_id
     `;
 
-    if (examCenterCode && examCenterCode !=0 && batchNo) {
+    if (examCenterCode && batchNo) {
         //query = queryExamCenterCodeBatchNo;
         query += ' WHERE students.center = ? AND students.batchNo = ?;'
         queryParams.push(examCenterCode, batchNo);
-    } else if (examCenterCode && examCenterCode!=0) {
+    } else if (examCenterCode) {
         //query = queryExamCenterCode;
         query += ' WHERE students.center = ?;'
         queryParams.push(examCenterCode);
-    } else if (examCenterCode==0 && batchNo) {
-        //query = queryBatchNo;
-        query += ' WHERE students.batchNo = ?;'
-        queryParams.push(batchNo);
     }
+    // } else if (examCenterCode==0 && batchNo) {
+    //     //query = queryBatchNo;
+    //     query += ' WHERE students.batchNo = ?;'
+    //     queryParams.push(batchNo);
+    // }
 
     try {
         //console.log("query: " + query);

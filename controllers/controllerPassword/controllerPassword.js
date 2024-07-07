@@ -23,10 +23,7 @@ exports.getControllerPassForCenter = async (req, res) => {
                     result.Start_time,
                     result.End_Time,
                     result.batchstatus
-                    )
-                    if (typeof controllerPassDet.controllerPass === 'string') {
-                        controllerPassDet.controllerPass = encryptionInterface.decrypt(controllerPassDet.controllerPass);
-                    }
+                    )                    
                     return controllerPassDet;
                 }
             )

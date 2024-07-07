@@ -24,19 +24,13 @@ exports.loginCenterAdmin= async (req, res) => {
             console.log(admin)
             let decryptedStoredPassword;
             try {
-                console.log("admin pass: "+admin.centerpass);
-                decryptedStoredPassword = decrypt(admin.centerpass);
-                //console.log(`Decrypted stored password: '${decryptedStoredPassword}'`);   
-            } catch (error) {
-                console.error('Error decrypting stored password:', error);
-                res.status(500).send('Error decrypting stored password');
+                console.log("admin pass: "+admin.centerpass + " provide pass: "+password);
+                   
+            } catch (error) {                
                 return;
             }
-            // Ensure both passwords are treated as strings
-            const decryptedStoredPasswordStr = String(decryptedStoredPassword).trim();
-            const providedPasswordStr = String(password).trim();
-         
-            if (decryptedStoredPasswordStr === providedPasswordStr) {
+            
+            if (admin.centerpass === password) {
                 // Set institute session
                 req.session.centerId = admin.center;
                 res.status(200).send('Logged in successfully as an center admin!');
