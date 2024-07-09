@@ -1,15 +1,6 @@
 
 const connection = require('../../config/db1');
 
-const xl = require('excel4node');
-
-const path = require('path');
-const fs = require('fs').promises;
-const Buffer = require('buffer').Buffer;
-
-const { encrypt, decrypt } =require('../../config/encrypt');
-const { request } = require('http');
-
 exports.loginCenterAdmin= async (req, res) => {
     console.log("Trying center admin login");
     const { centerId, password } = req.body;

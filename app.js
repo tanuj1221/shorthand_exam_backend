@@ -16,8 +16,12 @@ const studentRoutes = require('./routes/student_exam_routes')
 //shubh routes
 const pingMeRoutes = require('./routes/pingMe')
 const examCenterLoginDash = require('./routes/examCenterAuth-dashboard')
+
+const expertAuthRoutes = require('./routes/expertsAuth');
+
 const examCenterDetails = require('./routes/examCenterDetails-dashboard')
 const trackStudentRoutes = require('./routes/trackStudentRoute')
+
 
 const app = express();
 const PORT = 3000;
@@ -56,14 +60,10 @@ app.use(superAdminRoutes)
 
 //exam center admin dashboard
 app.use(examCenterLoginDash)
+app.use(expertAuthRoutes);
 app.use(examCenterDetails)
 app.use(trackStudentRoutes)
 
-// app.use(express.static(path.join(__dirname, 'build'))); // 'build' is the default directory for create-react-app builds
-
-// app.get('*', (req, res) => {
-//     res.sendFile(path.join(__dirname, 'build', 'index.html'));
-// });
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);

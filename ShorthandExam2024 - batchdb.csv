@@ -1,0 +1,17 @@
+batchNo,batchdate,Reporting_Time,Start_Time,End_Time,batchstatus
+100,24-Jun-24,8:30 AM,9:00 AM,10:15 AM,active
+101,26-Jun-24,8:30 AM,9:00 AM,10:15 AM,active
+102,26-Jun-24,10:15 AM,10:45 AM,12:15 PM,active
+103,26-Jun-24,12:30 PM,1:00 PM,2:45 PM,active
+104,26-Jun-24,2:45 PM,3:15 PM,5:15 PM,active
+105,26-Jun-24,5:00 PM,5:30 PM,7:30 PM,active
+201,27-Jun-24,8:30 AM,9:00 AM,10:15 AM,active
+202,27-Jun-24,10:15 AM,10:45 AM,12:15 PM,active
+203,27-Jun-24,12:30 PM,1:00 PM,2:45 PM,active
+204,27-Jun-24,2:45 PM,3:15 PM,5:15 PM,active
+205,27-Jun-24,5:00 PM,5:30 PM,7:30 PM,active
+301,28-Jun-24,8:30 AM,9:00 AM,10:15 AM,active
+302,28-Jun-24,10:15 AM,10:45 AM,12:15 PM,active
+303,28-Jun-24,12:30 PM,1:00 PM,2:45 PM,active
+304,28-Jun-24,2:45 PM,3:15 PM,5:15 PM,active
+305,28-Jun-24,5:00 PM,5:30 PM,7:30 PM,active
