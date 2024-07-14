@@ -98,7 +98,7 @@
             return;
         }
     
-        const sql = `SELECT passageA, passageB FROM finalpassagesubmit WHERE expertId = ? AND student_id = ?`;
+        const sql = `SELECT passageA, passageB, ansPassageA, ansPassageB FROM finalpassagesubmit WHERE expertId = ? AND student_id = ?`;
     
         try {
             const [results] = await connection.query(sql, [expertId, studentId]);
