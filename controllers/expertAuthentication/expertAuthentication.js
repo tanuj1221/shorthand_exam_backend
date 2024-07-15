@@ -67,20 +67,110 @@
         }
     };
 
+    exports.assignStudentForQSet = async (req, res) => {
+        if (!req.session.expertId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+    
+        const { subjectId, qset } = req.params;
+        const expertId = req.session.expertId;
+    
+        let conn;
+        try {
+            conn = await connection.getConnection();
+            await conn.beginTransaction();
+    
+            // Check if the expert already has an assigned student for this subject and qset
+            const checkAssignmentQuery = `
+                SELECT student_id 
+                FROM expertreviewlog 
+                WHERE subjectId = ? AND qset = ? AND expertId = ? 
+                LIMIT 1
+            `;
+            const [assignmentResult] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
+    
+            let student_id;
+    
+            if (assignmentResult.length > 0) {
+                // Expert already has an assignment, use the existing one
+                student_id = assignmentResult[0].student_id;
+            } else {
+                // Try to assign a new student
+                const assignStudentQuery = `
+                    UPDATE expertreviewlog 
+                    SET expertId = ? 
+                    WHERE subjectId = ? AND qset = ? AND expertId IS NULL 
+                    LIMIT 1
+                `;
+                const [assignResult] = await conn.query(assignStudentQuery, [expertId, subjectId, qset]);
+    
+                if (assignResult.affectedRows > 0) {
+                    // Fetch the student_id that was just assigned
+                    const [newAssignment] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
+                    student_id = newAssignment[0].student_id;
+                } else {
+                    throw new Error('No available students for this QSet');
+                }
+            }
+    
+            await conn.commit();
+            res.status(200).json({ qset, student_id });
+        } catch (err) {
+            if (conn) await conn.rollback();
+            console.error("Error assigning student for QSet:", err);
+            res.status(500).json({ error: 'Error assigning student for QSet' });
+        } finally {
+            if (conn) conn.release();
+        }
+    };
+
     exports.getQSetsForSubject = async (req, res) => {
         if (!req.session.expertId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
     
         const { subjectId } = req.params;
-        const qsetQuery = 'SELECT DISTINCT qset FROM expertreviewlog WHERE subjectId = ?';
+        const expertId = req.session.expertId;
     
         try {
-            const [results] = await connection.query(qsetQuery, [subjectId]);
-            res.status(200).json(results);
+            // Get the QSets for the subject
+            const qsetQuery = 'SELECT DISTINCT qset FROM expertreviewlog WHERE subjectId = ?';
+            const [qsetResults] = await connection.query(qsetQuery, [subjectId]);
+    
+            const availableQSets = qsetResults.map(qsetObj => qsetObj.qset);
+    
+            res.status(200).json(availableQSets);
         } catch (err) {
             console.error("Error fetching qsets:", err);
             res.status(500).json({ error: 'Error fetching qsets' });
+        }
+    };
+    
+    exports.getExpertAssignedPassages = async (req, res) => {
+        if (!req.session.expertId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+    
+        const { subjectId, qset } = req.params;
+        const expertId = req.session.expertId;
+    
+        try {
+            const query = `
+                SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
+                FROM expertreviewlog 
+                WHERE subjectId = ? AND qset = ? AND expertId = ?
+                LIMIT 1
+            `;
+            const [results] = await connection.query(query, [subjectId, qset, expertId]);
+    
+            if (results.length > 0) {
+                res.status(200).json(results[0]);
+            } else {
+                res.status(404).json({ error: 'No assigned passages found' });
+            }
+        } catch (err) {
+            console.error("Error fetching assigned passages:", err);
+            res.status(500).json({ error: 'Error fetching assigned passages' });
         }
     };
 

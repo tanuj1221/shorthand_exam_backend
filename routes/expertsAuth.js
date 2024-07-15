@@ -5,8 +5,9 @@ const examExpertAdminController = require('../controllers/expertAuthentication/e
 router.post('/expert-login',examExpertAdminController.loginExpertAdmin);
 router.get('/expert-details', examExpertAdminController.getExpertDetails); 
 router.get('/all-subjects', examExpertAdminController.getAllSubjects);
-router.get('/qsets/:subjectId', examExpertAdminController.getQSetsForSubject); // New endpoint
-
+router.get('/qsets/:subjectId', examExpertAdminController.getQSetsForSubject); 
+router.get('/expert-assigned-passages/:subjectId/:qset', examExpertAdminController.getExpertAssignedPassages);
+router.post('/assignStudent/:subjectId/:qset', examExpertAdminController.assignStudentForQSet);
 
 // router.get('/expert-assignments', examExpertAdminController.getExpertAssignments);
 // router.get('/student-passages/:studentId', examExpertAdminController.getStudentPassages);
