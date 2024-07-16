@@ -4,7 +4,7 @@
         console.log("Trying expert admin login");
         const { expertId, password } = req.body;
         console.log("expertId: "+ expertId + " password: "+ password);
-        const expertQuery = 'SELECT * FROM expertdb WHERE expertId = ?';
+        const expertQuery = 'SELECT expertId, password, expert_name FROM expertdb WHERE expertId = ?';
     
         try {
             const [results] = await connection.query(expertQuery, [expertId]);
@@ -17,12 +17,6 @@
                     // Set expert session
                     req.session.expertId = expert.expertId;
                     req.session.expert_name = expert.expert_name;
-                    
-                    // Fetch and log subjects
-                    const subjectsQuery = 'SELECT * FROM subjectsdb';
-                    const [subjectsResults] = await connection.query(subjectsQuery);
-                    console.log("Subjects available for expert:");
-                    console.log(subjectsResults);
                     
                     res.status(200).json({
                         message: 'Logged in successfully as an expert!'
@@ -56,10 +50,24 @@
             return res.status(401).json({ error: 'Unauthorized' });
         }
     
-        const subjectsQuery = 'SELECT * FROM subjectsdb';
+        const subjectsQuery = `
+            SELECT e.subjectId, s.subject_name, COUNT(DISTINCT e.student_id) as student_count
+            FROM expertreviewlog e
+            JOIN subjectsdb s ON e.subjectId = s.subjectId
+            WHERE e.student_id IS NOT NULL
+            GROUP BY e.subjectId, s.subject_name
+            ORDER BY e.subjectId
+        `;
     
         try {
             const [results] = await connection.query(subjectsQuery);
+            
+            // Console log the subjects and their student counts
+            console.log("Subjects available for expert with student counts:");
+            results.forEach(subject => {
+                console.log(`Subject ID: ${subject.subjectId}, Name: ${subject.subject_name}, Student Count: ${subject.student_count}`);
+            });
+    
             res.status(200).json(results);
         } catch (err) {
             console.error("Error fetching subjects:", err);
@@ -130,16 +138,26 @@
         }
     
         const { subjectId } = req.params;
-        const expertId = req.session.expertId;
     
         try {
-            // Get the QSets for the subject
-            const qsetQuery = 'SELECT DISTINCT qset FROM expertreviewlog WHERE subjectId = ?';
+            const qsetQuery = `
+                SELECT qset, COUNT(DISTINCT student_id) as student_count
+                FROM expertreviewlog 
+                WHERE subjectId = ?
+                GROUP BY qset
+                HAVING student_count > 0
+                ORDER BY qset
+            `;
             const [qsetResults] = await connection.query(qsetQuery, [subjectId]);
     
-            const availableQSets = qsetResults.map(qsetObj => qsetObj.qset);
+            console.log(`QSets for subject ${subjectId} with student counts:`);
+            qsetResults.forEach(qset => {
+                console.log(`QSet: ${qset.qset}, Student Count: ${qset.student_count}`);
+            });
     
-            res.status(200).json(availableQSets);
+            // const availableQSets = qsetResults.map(qsetObj => qsetObj.qset);
+    
+            res.status(200).json(qsetResults);
         } catch (err) {
             console.error("Error fetching qsets:", err);
             res.status(500).json({ error: 'Error fetching qsets' });
