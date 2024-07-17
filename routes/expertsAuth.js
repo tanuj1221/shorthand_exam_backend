@@ -8,7 +8,7 @@ router.get('/all-subjects', examExpertAdminController.getAllSubjects);
 router.get('/qsets/:subjectId', examExpertAdminController.getQSetsForSubject); 
 router.get('/expert-assigned-passages/:subjectId/:qset', examExpertAdminController.getExpertAssignedPassages);
 router.post('/assignStudent/:subjectId/:qset', examExpertAdminController.assignStudentForQSet);
-
+router.post('/active-passage',examExpertAdminController.getIgnoreList)
 // router.get('/expert-assignments', examExpertAdminController.getExpertAssignments);
 // router.get('/student-passages/:studentId', examExpertAdminController.getStudentPassages);
 

@@ -193,6 +193,44 @@
         }
     };
 
+    exports.getIgnoreList = async (req, res) => {
+        // Uncomment if authentication is required
+        // if (!req.session.expertId) {
+        //     return res.status(401).json({ error: 'Unauthorized' });
+        // }
+    
+        const { subjectId, qset, activePassage } = req.body;
+    
+        // Input validation
+        if (!subjectId || !qset || !activePassage) {
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+        console.log('this fetched')
+    
+        try {
+            const columnName = `Q${qset}P${activePassage}`;
+            
+            const query = `
+                SELECT ${columnName} AS ignoreList
+                FROM qsetdb 
+                WHERE subject_id = ?
+            `;
+            
+            const [results] = await connection.query(query, [subjectId]);
+    
+            if (results.length > 0 && results[0].ignoreList) {
+                // Split the ignore list string into an array
+                const ignoreList = results[0].ignoreList.split(',').map(item => item.trim());
+                res.status(200).json({ ignoreList });
+            } else {
+                res.status(404).json({ error: 'No ignore list found' });
+            }
+        } catch (err) {
+            console.error("Error fetching ignore list:", err);
+            res.status(500).json({ error: 'Error fetching ignore list' });
+        }
+    };
+
     // exports.getExpertAssignments = async (req, res) => {
     //     console.log("Before fetching")
     //     const { expertId } = req.session; // Use expertId from the session
