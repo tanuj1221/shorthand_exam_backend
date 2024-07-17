@@ -1,10 +1,8 @@
 const fs = require('fs');
 const fastCsv = require('fast-csv');
 const pool = require("../config/db1");
-const stream = require('stream');
-const util = require('util');
-
-const pipeline = util.promisify(stream.pipeline);
+const schema = require('../schema/schema');
+const moment = require('moment');
 
 exports.importCSV = async (req, res) => {
   if (!req.file) {
@@ -19,122 +17,155 @@ exports.importCSV = async (req, res) => {
     return res.status(400).json({ error: 'Table name is required' });
   }
 
-  const connection = await pool.getConnection();
-
   try {
-    await connection.beginTransaction();
+    // Read the columns from the CSV if the table does not exist
+    let columns;
+    const tableExists = await tableAlreadyExists(tableName);
 
-    // Get column names from the first row
-    const columns = await getColumnNames(csvFilePath);
+    if (!tableExists) {
+      columns = await new Promise((resolve, reject) => {
+        const stream = fs.createReadStream(csvFilePath)
+          .pipe(fastCsv.parse({ headers: true, encoding: 'utf8' }))
+          .on('error', reject)
+          .on('data', (row) => {
+            stream.pause();
+            resolve(Object.keys(row));
+            stream.destroy();
+          })
+          .on('end', () => {
+            reject(new Error('No data found in the CSV file'));
+          });
+      });
 
-    // Create table if not exists
-    const createTableQuery = `CREATE TABLE IF NOT EXISTS ?? (
-      ${columns.map(column => `\`${column}\` LONGTEXT`).join(', ')}
-    )`;
-    await connection.query(createTableQuery, [tableName]);
+      const createTableQuery = `CREATE TABLE IF NOT EXISTS ?? (
+        ${columns.map(column => {
+          const fieldType = schema[tableName] && schema[tableName][column] ? schema[tableName][column] : 'LONGTEXT';
+          return `\`${column}\` ${fieldType}`;
+        }).join(', ')}
+      )`;
 
-    // Truncate the table
-    await connection.query(`TRUNCATE TABLE ??`, [tableName]);
+      await executeQuery(createTableQuery, [tableName]);
+    } else {
+      columns = await getTableColumns(tableName);
+    }
 
-    // Process CSV in chunks
-    await processCSVInChunks(connection, tableName, columns, csvFilePath);
+    // Insert data
+    const stream = fs.createReadStream(csvFilePath)
+      .pipe(fastCsv.parse({ headers: true }))
+      .on('error', (error) => {
+        throw error;
+      });
 
-    await connection.commit();
+    const chunkSize = 250; // Reduced chunk size
+    let chunk = [];
+    let totalInserted = 0;
+
+    for await (const row of stream) {
+      chunk.push(row);
+      if (chunk.length >= chunkSize) {
+        await insertChunk(tableName, columns, chunk);
+        totalInserted += chunk.length;
+        chunk = [];
+        console.log(`Inserted ${totalInserted} rows so far...`);
+      }
+    }
+
+    if (chunk.length > 0) {
+      await insertChunk(tableName, columns, chunk);
+      totalInserted += chunk.length;
+    }
+
     fs.unlinkSync(csvFilePath);
-    res.json({ message: `CSV data imported into table '${tableName}' successfully` });
+    res.json({ message: `CSV data imported into table '${tableName}' successfully. Total rows inserted: ${totalInserted}` });
   } catch (error) {
-    await connection.rollback();
     console.error('Error processing CSV:', error.message);
     fs.unlinkSync(csvFilePath);
     res.status(500).json({ error: error.message });
-  } finally {
-    connection.release();
   }
 };
 
-async function getColumnNames(filePath) {
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(filePath)
-      .pipe(fastCsv.parse({ headers: true }))
-      .on('headers', (headers) => {
-        resolve(headers);
-      })
-      .on('error', reject)
-      .on('data', () => {
-        // We only need the headers, so we can destroy the stream after getting them
-        this.destroy();
-      });
-  });
-}
-
-async function processCSVInChunks(connection, tableName, columns, filePath) {
-  const chunkSize = 300;
-  let chunk = [];
-  let rowCount = 0;
-
-  const insertQuery = `INSERT INTO ?? (${columns.map(column => `\`${column}\``).join(', ')}) VALUES ?`;
-
-  await pipeline(
-    fs.createReadStream(filePath),
-    fastCsv.parse({ headers: true }),
-    new stream.Transform({
-      objectMode: true,
-      transform: async function(row, encoding, callback) {
-        chunk.push(row);
-        rowCount++;
-
-        if (chunk.length >= chunkSize) {
-          await insertChunk(connection, tableName, columns, chunk, insertQuery);
-          chunk = [];
-          console.log(`Processed ${rowCount} rows`);
-        }
-
-        callback();
-      },
-      flush: async function(callback) {
-        if (chunk.length > 0) {
-          await insertChunk(connection, tableName, columns, chunk, insertQuery);
-          console.log(`Processed ${rowCount} rows`);
-        }
-        callback();
-      }
-    })
-  );
-}
-
-async function insertChunk(connection, tableName, columns, chunk, insertQuery) {
-  const maxRetries = 3;
-  let retries = 0;
-
-  while (retries < maxRetries) {
+async function executeQuery(query, params, retries = 3) {
+  let lastError;
+  for (let i = 0; i < retries; i++) {
     try {
-      const values = chunk.map(row => {
-        return columns.map(column => {
-          const value = row[column];
-          if (column === 'image' && value) {
-            console.log(`Size of image data: ${Buffer.byteLength(value, 'utf8')} bytes`);
-          }
-          return value;
-        });
-      });
-
-      await connection.query(insertQuery, [tableName, values]);
-      return; // Success, exit the function
+      const connection = await pool.getConnection();
+      try {
+        const result = await connection.query(query, params);
+        return result;
+      } finally {
+        connection.release();
+      }
     } catch (error) {
-      retries++;
-      console.error(`Error inserting chunk (attempt ${retries}/${maxRetries}):`, error.message);
-      
-      if (error.code === 'EPIPE' || error.code === 'PROTOCOL_CONNECTION_LOST') {
-        console.log('Connection lost. Attempting to reconnect...');
-        connection = await pool.getConnection();
+      console.error(`Query failed, attempt ${i + 1} of ${retries}:`, error.message);
+      lastError = error;
+      if (error.code === 'ECONNRESET') {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second before retrying
+      } else {
+        throw error; // For other errors, throw immediately
       }
-
-      if (retries === maxRetries) {
-        throw error; // Rethrow the error if all retries failed
-      }
-
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000 * retries));
     }
   }
+  throw lastError; // If all retries fail, throw the last error
+}
+
+async function tableAlreadyExists(tableName) {
+  const [results] = await executeQuery('SHOW TABLES LIKE ?', [tableName]);
+  return results.length > 0;
+}
+
+async function getTableColumns(tableName) {
+  const [results] = await executeQuery('SHOW COLUMNS FROM ??', [tableName]);
+  return results.map(result => result.Field);
+}
+
+async function insertChunk(tableName, columns, chunk) {
+  const insertQuery = `INSERT INTO ?? (${columns.map(column => `\`${column}\``).join(', ')}) VALUES ?`;
+  const values = chunk.map(row => {
+    const rowValues = columns.map(column => {
+      let value = row[column];
+      const fieldType = schema[tableName] && schema[tableName][column];
+
+      // Handle null and empty string values
+      if (value === '' || value === null || value === undefined) {
+        return null;
+      }
+
+      // Process courseId and subjectId columns
+      if (column === 'courseId' || column === 'subjectId') {
+        if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+          value = parseInt(value.replace(/[\[\]\s]/g, ''), 10);
+        }
+      }
+
+      // Process loggedin and done columns
+      if (column === 'loggedin' || column === 'done') {
+        return value && (value.toLowerCase() === 'yes' || value.toLowerCase() === 'true' || value === '1');
+      }
+
+      // Process time columns
+      if (fieldType === 'TIME') {
+        if (value) {
+          const time = moment(value, ['h:mm A', 'HH:mm']);
+          return time.isValid() ? time.format('HH:mm:ss') : null;
+        }
+        return null;
+      }
+
+      if (fieldType === 'BOOLEAN') {
+        return value && (value.toLowerCase() === 'yes' || value.toLowerCase() === 'true' || value === '1');
+      } else if (fieldType === 'INT' || fieldType === 'BIGINT') {
+        return isNaN(parseInt(value, 10)) ? null : parseInt(value, 10);
+      } else if (fieldType === 'DECIMAL') {
+        return isNaN(parseFloat(value)) ? null : parseFloat(value);
+      } else if (fieldType === 'DATE') {
+        return value ? new Date(value) : null;
+      } else if (fieldType === 'TIMESTAMP') {
+        return value ? new Date(value) : null;
+      } else {
+        return value;
+      }
+    });
+    return rowValues;
+  });
+  await executeQuery(insertQuery, [tableName, values]);
 }
