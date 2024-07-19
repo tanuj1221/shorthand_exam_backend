@@ -1,3 +1,4 @@
+    // expertAuthentication.js
     const connection = require('../../config/db1');
 
     exports.loginExpertAdmin = async (req, res) => {
@@ -19,7 +20,8 @@
                     req.session.expert_name = expert.expert_name;
                     
                     res.status(200).json({
-                        message: 'Logged in successfully as an expert!'
+                        message: 'Logged in successfully as an expert!',
+                        expertId: expert.expertId
                     });
                     
                 } else {
@@ -212,7 +214,7 @@
             
             const query = `
                 SELECT ${columnName} AS ignoreList
-                FROM qsetdb 
+                FROM qsetdb
                 WHERE subject_id = ?
             `;
             
@@ -221,6 +223,7 @@
             if (results.length > 0 && results[0].ignoreList) {
                 // Split the ignore list string into an array
                 const ignoreList = results[0].ignoreList.split(',').map(item => item.trim());
+                console.log(ignoreList)
                 res.status(200).json({ ignoreList });
             } else {
                 res.status(404).json({ error: 'No ignore list found' });
@@ -230,6 +233,141 @@
             res.status(500).json({ error: 'Error fetching ignore list' });
         }
     };
+
+    exports.addToIgnoreList = async (req, res) => {
+        // Uncomment if authentication is required
+        // if (!req.session.expertId) {
+        //     return res.status(401).json({ error: 'Unauthorized' });
+        // }
+    
+        const { subjectId, qset, activePassage, newWord } = req.body;
+    
+        // Input validation
+        if (!subjectId || !qset || !activePassage || !newWord) {
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+    
+        try {
+            const columnName = `Q${qset}P${activePassage}`;
+            
+            // First, fetch the current ignore list
+            const selectQuery = `
+                SELECT ${columnName} AS ignoreList
+                FROM qsetdb
+                WHERE subject_id = ?
+            `;
+            
+            const [results] = await connection.query(selectQuery, [subjectId]);
+    
+            let currentIgnoreList = [];
+            if (results.length > 0 && results[0].ignoreList) {
+                currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
+            }
+    
+            // Add the new word if it's not already in the list
+            if (!currentIgnoreList.includes(newWord)) {
+                currentIgnoreList.push(newWord);
+            }
+    
+            // Join the list back into a comma-separated string
+            const updatedIgnoreList = currentIgnoreList.join(', ');
+    
+            // Update the database with the new ignore list
+            const updateQuery = `
+                UPDATE qsetdb
+                SET ${columnName} = ?
+                WHERE subject_id = ?
+            `;
+    
+            await connection.query(updateQuery, [updatedIgnoreList, subjectId]);
+            console.log(currentIgnoreList)
+    
+            res.status(200).json({ message: 'Word added to ignore list', ignoreList: currentIgnoreList });
+        } catch (err) {
+            console.error("Error adding word to ignore list:", err);
+            res.status(500).json({ error: 'Error adding word to ignore list' });
+        }
+    };
+
+    exports.removeFromIgnoreList = async (req, res) => {
+        // Uncomment if authentication is required
+        if (!req.session.expertId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+    
+        const { subjectId, qset, activePassage, wordToRemove } = req.body;
+    
+        // Input validation
+        if (!subjectId || !qset || !activePassage || !wordToRemove) {
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+    
+        try {
+            const columnName = `Q${qset}P${activePassage}`;
+            
+            // First, fetch the current ignore list
+            const selectQuery = `
+                SELECT ${columnName} AS ignoreList
+                FROM qsetdb 
+                WHERE subject_id = ?
+            `;
+            
+            const [results] = await connection.query(selectQuery, [subjectId]);
+    
+            if (results.length === 0 || !results[0].ignoreList) {
+                return res.status(404).json({ error: 'No ignore list found' });
+            }
+    
+            let currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
+    
+            // Remove the word from the list
+            currentIgnoreList = currentIgnoreList.filter(word => word !== wordToRemove);
+    
+            // Join the list back into a comma-separated string
+            const updatedIgnoreList = currentIgnoreList.join(', ');
+    
+            // Update the database with the new ignore list
+            const updateQuery = `
+                UPDATE qsetdb
+                SET ${columnName} = ?
+                WHERE subject_id = ?
+            `;
+    
+            await connection.query(updateQuery, [updatedIgnoreList, subjectId]);
+            console.log(currentIgnoreList)
+    
+            res.status(200).json({ message: 'Word removed from ignore list', ignoreList: currentIgnoreList });
+        } catch (err) {
+            console.error("Error removing word from ignore list:", err);
+            res.status(500).json({ error: 'Error removing word from ignore list' });
+        }
+    };
+
+    // exports.getStudentPassages = async (req, res) => {
+    //     if (!req.session.expertId) {
+    //         return res.status(401).json({error: 'Unauthorized'});
+    //     }
+    //     const { studentId } = req.body;
+
+    //     try{
+    //         const query = `
+    //         SELECT subjectId, qset
+    //         FROM expertreviewlog
+    //         WHERE student_id = ?
+    //         LIMIT 1
+    //         `;
+    //         const [results] = await connection.query(query, [studentId]);
+
+    //         if (results.length > 0) {
+    //             res.status(200).json(results[0]);
+    //         } else {
+    //             res.status(404).json({ error: 'No matching record found' });
+    //         }
+    //     } catch (err) {
+    //         console.error("Error fetching student details:", err);
+    //         res.status(500).json({ error: 'Error fetching student details' });
+    //     }
+    // }
 
     // exports.getExpertAssignments = async (req, res) => {
     //     console.log("Before fetching")
