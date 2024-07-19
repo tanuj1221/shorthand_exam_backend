@@ -173,7 +173,7 @@ const schema = {
     qsetdb: {
         id: 'INT PRIMARY KEY AUTO_INCREMENT',
         subject_id: 'INT REFERENCES subjectdb(subjectId)',
-        Q1PA: 'TEXT',
+        Q1PA: 'TEXT*',
         Q1PB: 'TEXT',
         Q2PA: 'TEXT',
         Q2PB: 'TEXT',
