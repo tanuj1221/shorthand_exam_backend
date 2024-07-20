@@ -56,7 +56,7 @@ exports.importCSV = async (req, res) => {
         throw error;
       });
 
-    const chunkSize = 250; // Reduced chunk size
+    const chunkSize = 100; // Reduced chunk size
     let chunk = [];
     let totalInserted = 0;
 
