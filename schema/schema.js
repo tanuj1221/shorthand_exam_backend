@@ -130,7 +130,7 @@ const schema = {
         passageB_word_count: 'INT',
         ansPassageA: 'TEXT',
         ansPassageB: 'TEXT',
-        subjectId: 'INT REFERENCES subjectsdb(subjectId), REFERENCES qsetdb(subject_id)',
+        subjectId: 'INT REFERENCES subjectsdb(subjectId)',
         qset: 'INT',
         expertId: 'INT REFERENCES expertdb(expertId)',
         loggedin: 'DATETIME',
