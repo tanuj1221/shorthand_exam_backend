@@ -20,15 +20,6 @@ const schema = {
         day: 'INT',
         qset: 'INT',
     },
-    subjectsdb: {
-        subjectId: 'INT PRIMARY KEY',
-        courseId: 'INT',
-        subject_name: 'VARCHAR(100)',
-        subject_name_short: 'VARCHAR(50)',
-        daily_timer: 'INT',
-        passage_timer: 'INT',
-        demo_timer: 'INT'
-    },
     studentlogs: {
         id: 'BIGINT PRIMARY KEY',
         student_id: 'BIGINT REFERENCES students(student_id)',
@@ -128,6 +119,8 @@ const schema = {
         passageA: 'LONGTEXT',
         passageB: 'LONGTEXT',
     },
+
+    // Expert Dashboard
     expertreviewlog: {
         id: 'BIGINT PRIMARY KEY AUTO_INCREMENT',
         student_id: 'BIGINT',
@@ -142,7 +135,17 @@ const schema = {
         expertId: 'INT REFERENCES expertdb(expertId)',
         loggedin: 'DATETIME',
         status: 'BOOLEAN',
-        submitted: 'DATETIME'
+        subm_done: 'BOOLEAN',
+        subm_time: 'DATETIME'
+    },
+    subjectsdb: {
+        subjectId: 'INT PRIMARY KEY',
+        courseId: 'INT',
+        subject_name: 'VARCHAR(100)',
+        subject_name_short: 'VARCHAR(50)',
+        daily_timer: 'INT',
+        passage_timer: 'INT',
+        demo_timer: 'INT'
     },
     expertdb: {
         expertId: 'INT PRIMARY KEY',
