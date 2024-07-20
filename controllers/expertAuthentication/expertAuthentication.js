@@ -119,7 +119,9 @@
                     const [newAssignment] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
                     student_id = newAssignment[0].student_id;
                 } else {
-                    throw new Error('No available students for this QSet');
+                    // No available students
+                    await conn.rollback();
+                    return res.status(400).json({ error: 'No available students for this QSet. All students are already assigned to other experts.' });
                 }
             }
     
@@ -343,31 +345,31 @@
         }
     };
 
-    // exports.getStudentPassages = async (req, res) => {
-    //     if (!req.session.expertId) {
-    //         return res.status(401).json({error: 'Unauthorized'});
-    //     }
-    //     const { studentId } = req.body;
+    exports.getStudentPassages = async (req, res) => {
+        if (!req.session.expertId) {
+            return res.status(401).json({error: 'Unauthorized'});
+        }
+        const { studentId } = req.body;
 
-    //     try{
-    //         const query = `
-    //         SELECT subjectId, qset
-    //         FROM expertreviewlog
-    //         WHERE student_id = ?
-    //         LIMIT 1
-    //         `;
-    //         const [results] = await connection.query(query, [studentId]);
+        try{
+            const query = `
+            SELECT subjectId, qset
+            FROM expertreviewlog
+            WHERE student_id = ?
+            LIMIT 1
+            `;
+            const [results] = await connection.query(query, [studentId]);
 
-    //         if (results.length > 0) {
-    //             res.status(200).json(results[0]);
-    //         } else {
-    //             res.status(404).json({ error: 'No matching record found' });
-    //         }
-    //     } catch (err) {
-    //         console.error("Error fetching student details:", err);
-    //         res.status(500).json({ error: 'Error fetching student details' });
-    //     }
-    // }
+            if (results.length > 0) {
+                res.status(200).json(results[0]);
+            } else {
+                res.status(404).json({ error: 'No matching record found' });
+            }
+        } catch (err) {
+            console.error("Error fetching student details:", err);
+            res.status(500).json({ error: 'Error fetching student details' });
+        }
+    }
 
     // exports.getExpertAssignments = async (req, res) => {
     //     console.log("Before fetching")

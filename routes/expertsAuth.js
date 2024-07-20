@@ -12,9 +12,9 @@ router.post('/assignStudent/:subjectId/:qset', examExpertAdminController.assignS
 router.post('/active-passage',examExpertAdminController.getIgnoreList)
 router.post('/add-ignore-word',examExpertAdminController.addToIgnoreList)
 router.post('/undo-word',examExpertAdminController.removeFromIgnoreList)
+router.post('/get-student-passages', examExpertAdminController.getStudentPassages);
 
 // router.post('/get-student-details', examExpertAdminController.getStudentPassages);
 // router.get('/expert-assignments', examExpertAdminController.getExpertAssignments);
-// router.get('/student-passages/:studentId', examExpertAdminController.getStudentPassages);
 
 module.exports = router;
