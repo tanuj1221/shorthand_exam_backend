@@ -26,8 +26,18 @@ const trackStudentRoutes = require('./routes/trackStudentRoute')
 const app = express();
 const PORT = 3000;
 
+app.use(express.static(path.join(__dirname, 'my-app/build')));
+
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; style-src 'self' 'unsafe-inline';"
+  );
+  next();
+});
+
 app.use(cors({
-  origin: 'http://localhost:3001',
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
 
@@ -64,8 +74,15 @@ app.use(expertAuthRoutes);
 app.use(examCenterDetails)
 app.use(trackStudentRoutes)
 
-app.get('', (req, res) => {
-  res.sendFile(path.join(__dirname+'/build/index.html'));
+app.use(express.static(path.join(__dirname, 'build')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
 });
 
 app.listen(PORT, '0.0.0.0', () => {
