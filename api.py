@@ -73,6 +73,20 @@ def compare_texts(text1, text2, ignore_list, ignore_case=False):
                     missed.append(old)
                     added.append(new)
 
+
+        for word in words1[i1+len(words2[j1:j2]):i2]:
+                if word.lower() not in ignore_list:
+                    colored_words.append({'word': word, 'color': 'red'})
+                    missed.append(word)
+
+        for word in words2[j1+len(words1[i1:i2]):j2]:
+                colored_words.append({'word': word, 'color': 'green'})
+                if word.lower() not in ignore_list:
+                    added.append(word)
+
+
+
+
     return {
         'colored_words': colored_words,
         'added': added,
