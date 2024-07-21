@@ -33,13 +33,13 @@ app.use(express.static(path.join(__dirname, 'build')));
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; style-src 'self' 'unsafe-inline';"
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://13.233.196.0:5000;"
   );
   next();
 });
 
 app.use(cors({
-  origin: ['http://13.127.206.181:3000', '*', 'http://13.127.206.181:3001', 'http://13.233.196.0:5000'],
+  origin: ['http://13.127.206.181:3000', 'http://13.127.206.181:3001', 'http://13.233.196.0:5000'],
   credentials: true
 }));
 
