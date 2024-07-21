@@ -14,14 +14,16 @@ const dataInputRoutes = require('./routes/data_input_routes')
 const studentRoutes = require('./routes/student_exam_routes')
 
 //shubh routes
-const pingMeRoutes = require('./routes/pingMe')
-const examCenterLoginDash = require('./routes/examCenterAuth-dashboard')
+const pingMeRoutes = require('./routes/pingMe');
+const examCenterLoginDash = require('./routes/examCenterAuth-dashboard');
 
 const expertAuthRoutes = require('./routes/expertsAuth');
 
-const examCenterDetails = require('./routes/examCenterDetails-dashboard')
-const trackStudentRoutes = require('./routes/trackStudentRoute')
+const examCenterDetails = require('./routes/examCenterDetails-dashboard');
+const trackStudentRoutes = require('./routes/trackStudentRoute');
 
+//shubh result dashboard routes
+const subjectWiseDashboard = require('./routes/resultSummary');
 
 const app = express();
 const PORT = 3000;
@@ -73,6 +75,10 @@ app.use(examCenterLoginDash)
 app.use(expertAuthRoutes);
 app.use(examCenterDetails)
 app.use(trackStudentRoutes)
+
+//result dashboard
+app.use(subjectWiseDashboard)
+
 
 app.use(express.static(path.join(__dirname, 'build')));
 
