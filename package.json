@@ -33,6 +33,7 @@
     "nstall": "^0.2.0",
     "path": "^0.12.7",
     "razorpay": "^2.9.2",
+    "socket.io": "^4.7.5",
     "styled-components": "^6.1.11",
     "xlsx": "^0.18.5"
   }

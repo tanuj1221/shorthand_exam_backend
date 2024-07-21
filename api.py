@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True) 
 
 # Common words to ignore
-common_words = set(['a', 'an', 'the', 'of', 'and', 'be', 'to'])
+common_words = set(['a', 'an', 'the', 'to'])
 
 def compare_texts(text1, text2, ignore_list, ignore_case=False):
     added = []
