@@ -1,3 +1,5 @@
+
+
 // expertAuthentication.js
 const connection = require('../../config/db1');
 
@@ -125,7 +127,7 @@ exports.assignStudentForQSet = async (req, res) => {
             const assignStudentQuery = `
                 UPDATE expertreviewlog 
                 SET expertId = ?, loggedin = NOW(), status = 1, subm_done = 0, subm_time = NULL
-                WHERE subjectId = ? AND qset = ? AND expertId IS NULL 
+                WHERE subjectId = ? AND qset = ? AND expertId IS NULL AND student_id IS NOT NULL
                 LIMIT 1
             `;
             const [assignResult] = await conn.query(assignStudentQuery, [expertId, subjectId, qset]);
@@ -201,7 +203,6 @@ exports.getExpertAssignedPassages = async (req, res) => {
             SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
             FROM expertreviewlog 
             WHERE subjectId = ? AND qset = ? AND expertId = ?
-            ORDER BY loggedin DESC
             LIMIT 1
         `;
         const [results] = await connection.query(query, [subjectId, qset, expertId]);
@@ -446,7 +447,7 @@ exports.submitPassageReview = async (req, res) => {
         const updateQuery = `
             UPDATE expertreviewlog 
             SET subm_done = 1, subm_time = NOW()
-            WHERE subjectId = ? AND qset = ? AND expertId = ?
+            WHERE subjectId = ? AND qset = ? AND expertId = ? AND student_id IS NOT NULL
         `;
         await conn.query(updateQuery, [subjectId, qset, expertId]);
 
@@ -473,60 +474,5 @@ exports.submitPassageReview = async (req, res) => {
         if (conn) conn.release();
     }
 };
-
-
-// exports.getExpertAssignments = async (req, res) => {
-//     console.log("Before fetching")
-//     const { expertId } = req.session; // Use expertId from the session
-
-//     if (!expertId) {
-//         res.status(401).send('Unauthorized');
-//         return;
-//     }
-
-//     const sql = `SELECT student_id FROM finalpassagesubmit WHERE expertId = ?`;
-//     try {
-//         const [results] = await connection.query(sql, [expertId]); // Use expertId to fetch student IDs
-//         if (results.length > 0) {
-//             res.status(200).json(results); // Send the array of results
-
-//             // Log all student_id values
-//             results.forEach((result, index) => {
-//                 console.log(`Student ${index + 1}: ${result.student_id}`);
-//             });
-
-//         } else {
-//             res.status(404).json({ error: 'No students found for this expert' });
-//         }
-//     } catch (err) {
-//         console.error('Error fetching student details:', err);
-//         res.status(500).json({ error: 'Internal Server Error' });
-//     }
-// };
-
-// exports.getStudentPassages = async (req, res) => {
-//     const { expertId } = req.session;
-//     const { studentId } = req.params;
-
-//     if (!expertId) {
-//         res.status(401).send('Unauthorized');
-//         return;
-//     }
-
-//     const sql = `SELECT passageA, passageB, ansPassageA, ansPassageB FROM finalpassagesubmit WHERE expertId = ? AND student_id = ?`;
-
-//     try {
-//         const [results] = await connection.query(sql, [expertId, studentId]);
-//         if (results.length > 0) {
-//             res.status(200).json(results[0]);
-//         } else {
-//             res.status(404).json({ error: 'No passages found for this student' });
-//         }
-//     } catch (err) {
-//         console.error('Error fetching passages:', err);
-//         res.status(500).json({ error: 'Internal Server Error' });
-//     }
-// };
-
 
 

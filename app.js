@@ -28,7 +28,7 @@ const subjectWiseDashboard = require('./routes/resultSummary');
 const app = express();
 const PORT = 3000;
 
-app.use(express.static(path.join(__dirname, 'my-app/build')));
+app.use(express.static(path.join(__dirname, 'build')));
 
 app.use((req, res, next) => {
   res.setHeader(
@@ -39,7 +39,7 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: ['http://13.127.206.181:3000', '*', 'http://13.127.206.181:3001'],
   credentials: true
 }));
 
@@ -93,5 +93,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
-  });
+});
   
