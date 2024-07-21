@@ -203,6 +203,7 @@ exports.getExpertAssignedPassages = async (req, res) => {
             SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
             FROM expertreviewlog 
             WHERE subjectId = ? AND qset = ? AND expertId = ?
+            ORDER BY loggedin DESC
             LIMIT 1
         `;
         const [results] = await connection.query(query, [subjectId, qset, expertId]);
@@ -271,7 +272,11 @@ exports.addToIgnoreList = async (req, res) => {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    let conn;
     try {
+        conn = await connection.getConnection();
+        await conn.beginTransaction();
+
         const columnName = `Q${qset}P${activePassage}`;
         
         // First, fetch the current ignore list
@@ -279,9 +284,10 @@ exports.addToIgnoreList = async (req, res) => {
             SELECT ${columnName} AS ignoreList
             FROM qsetdb
             WHERE subject_id = ?
+            FOR UPDATE
         `;
         
-        const [results] = await connection.query(selectQuery, [subjectId]);
+        const [results] = await conn.query(selectQuery, [subjectId]);
 
         let currentIgnoreList = [];
         if (results.length > 0 && results[0].ignoreList) {
@@ -303,18 +309,22 @@ exports.addToIgnoreList = async (req, res) => {
             WHERE subject_id = ?
         `;
 
-        await connection.query(updateQuery, [updatedIgnoreList, subjectId]);
-        console.log(currentIgnoreList)
+        await conn.query(updateQuery, [updatedIgnoreList, subjectId]);
+        
+        await conn.commit();
+        console.log(currentIgnoreList);
 
         res.status(200).json({ message: 'Word added to ignore list', ignoreList: currentIgnoreList });
     } catch (err) {
+        if (conn) await conn.rollback();
         console.error("Error adding word to ignore list:", err);
         res.status(500).json({ error: 'Error adding word to ignore list' });
+    } finally {
+        if (conn) conn.release();
     }
 };
 
 exports.removeFromIgnoreList = async (req, res) => {
-    // Uncomment if authentication is required
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -326,7 +336,11 @@ exports.removeFromIgnoreList = async (req, res) => {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    let conn;
     try {
+        conn = await connection.getConnection();
+        await conn.beginTransaction();
+
         const columnName = `Q${qset}P${activePassage}`;
         
         // First, fetch the current ignore list
@@ -334,11 +348,13 @@ exports.removeFromIgnoreList = async (req, res) => {
             SELECT ${columnName} AS ignoreList
             FROM qsetdb 
             WHERE subject_id = ?
+            FOR UPDATE
         `;
         
-        const [results] = await connection.query(selectQuery, [subjectId]);
+        const [results] = await conn.query(selectQuery, [subjectId]);
 
         if (results.length === 0 || !results[0].ignoreList) {
+            await conn.rollback();
             return res.status(404).json({ error: 'No ignore list found' });
         }
 
@@ -357,13 +373,18 @@ exports.removeFromIgnoreList = async (req, res) => {
             WHERE subject_id = ?
         `;
 
-        await connection.query(updateQuery, [updatedIgnoreList, subjectId]);
-        console.log(currentIgnoreList)
+        await conn.query(updateQuery, [updatedIgnoreList, subjectId]);
+        
+        await conn.commit();
+        console.log(currentIgnoreList);
 
         res.status(200).json({ message: 'Word removed from ignore list', ignoreList: currentIgnoreList });
     } catch (err) {
+        if (conn) await conn.rollback();
         console.error("Error removing word from ignore list:", err);
         res.status(500).json({ error: 'Error removing word from ignore list' });
+    } finally {
+        if (conn) conn.release();
     }
 };
 
