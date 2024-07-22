@@ -97,43 +97,69 @@ exports.assignStudentForQSet = async (req, res) => {
             SELECT student_id, loggedin, status, subm_done, subm_time
             FROM expertreviewlog 
             WHERE subjectId = ? AND qset = ? AND expertId = ? 
+            ORDER BY loggedin DESC
             LIMIT 1
         `;
         const [assignmentResult] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
 
         let student_id, loggedin, status, subm_done, subm_time;
 
-        if (assignmentResult.length > 0 && assignmentResult[0].subm_done !== 1) {
-            // Expert already has an unsubmitted assignment, use the existing one
+        if (assignmentResult.length > 0) {
+            // Expert has an existing assignment
             student_id = assignmentResult[0].student_id;
             loggedin = assignmentResult[0].loggedin;
             status = assignmentResult[0].status;
             subm_done = assignmentResult[0].subm_done;
             subm_time = assignmentResult[0].subm_time;
 
-            // Update login status if not already logged in
-            if (!status) {
-                const updateLoginQuery = `
+            if (subm_done === 1 && subm_time !== null) {
+                // The current assignment is complete, try to assign a new student
+                const assignNewStudentQuery = `
                     UPDATE expertreviewlog 
-                    SET loggedin = NOW(), status = 1
-                    WHERE student_id = ? AND subjectId = ? AND qset = ? AND expertId = ?
+                    SET expertId = ?, loggedin = NOW(), status = 1, subm_done = 0, subm_time = NULL
+                    WHERE subjectId = ? AND qset = ? AND expertId IS NULL AND student_id IS NOT NULL
+                    LIMIT 1
                 `;
-                await conn.query(updateLoginQuery, [student_id, subjectId, qset, expertId]);
-                loggedin = new Date();
-                status = 1;
+                const [assignResult] = await conn.query(assignNewStudentQuery, [expertId, subjectId, qset]);
+
+                if (assignResult.affectedRows > 0) {
+                    // Fetch the new assignment details
+                    const [newAssignment] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
+                    student_id = newAssignment[0].student_id;
+                    loggedin = newAssignment[0].loggedin;
+                    status = newAssignment[0].status;
+                    subm_done = newAssignment[0].subm_done;
+                    subm_time = newAssignment[0].subm_time;
+                } else {
+                    // No available students
+                    await conn.rollback();
+                    return res.status(400).json({ error: 'No available students for this QSet. All students are already assigned to other experts.' });
+                }
+            } else {
+                // The current assignment is not complete, update login status if not already logged in
+                if (!status) {
+                    const updateLoginQuery = `
+                        UPDATE expertreviewlog 
+                        SET loggedin = NOW(), status = 1
+                        WHERE student_id = ? AND subjectId = ? AND qset = ? AND expertId = ?
+                    `;
+                    await conn.query(updateLoginQuery, [student_id, subjectId, qset, expertId]);
+                    loggedin = new Date();
+                    status = 1;
+                }
             }
         } else {
-            // Try to assign a new student
-            const assignStudentQuery = `
+            // Expert has no existing assignment, try to assign a new student
+            const assignNewStudentQuery = `
                 UPDATE expertreviewlog 
                 SET expertId = ?, loggedin = NOW(), status = 1, subm_done = 0, subm_time = NULL
                 WHERE subjectId = ? AND qset = ? AND expertId IS NULL AND student_id IS NOT NULL
                 LIMIT 1
             `;
-            const [assignResult] = await conn.query(assignStudentQuery, [expertId, subjectId, qset]);
+            const [assignResult] = await conn.query(assignNewStudentQuery, [expertId, subjectId, qset]);
 
             if (assignResult.affectedRows > 0) {
-                // Fetch the student_id that was just assigned
+                // Fetch the new assignment details
                 const [newAssignment] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
                 student_id = newAssignment[0].student_id;
                 loggedin = newAssignment[0].loggedin;
@@ -261,9 +287,9 @@ exports.getIgnoreList = async (req, res) => {
 
 exports.addToIgnoreList = async (req, res) => {
     // Uncomment if authentication is required
-    // if (!req.session.expertId) {
-    //     return res.status(401).json({ error: 'Unauthorized' });
-    // }
+    if (!req.session.expertId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     const { subjectId, qset, activePassage, newWord } = req.body;
 
