@@ -1,14 +1,12 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import re
 import difflib
 from Levenshtein import distance as levenshtein_distance
 
-app = Flask(__name__)
-CORS(app, supports_credentials=True) 
-
 # Common words to ignore
 common_words = set(['a', 'an', 'the', 'to'])
+
+text1 = "I think it a great to be associate with this faction. I am not a man of the science had all constantly of the process which you might be presenting in this laboratories."
+text2 = "I thhink it right to be associate with this faction. I am not a man of the science had all constantly of the process which you might be presenting in this laboratores."
 
 def compare_texts(text1, text2, ignore_list, ignore_case=False):
     added = []
@@ -28,6 +26,9 @@ def compare_texts(text1, text2, ignore_list, ignore_case=False):
     s = difflib.SequenceMatcher(None, words1, words2)
     opcodes = s.get_opcodes()
 
+    print("opcodes: "+str(opcodes))
+
+    print()
     
     for tag, i1, i2, j1, j2 in opcodes:
         if tag == 'equal':
@@ -96,22 +97,4 @@ def compare_texts(text1, text2, ignore_list, ignore_case=False):
         'grammar': grammar
     }
 
-@app.route('/compare', methods=['POST'])
-def compare():
-    data = request.json
-    text1 = data.get('text1')
-    text2 = data.get('text2')
-    ignore_list = data.get('ignore_list', [])
-    ignore_case = data.get('ignore_case', False)
-
-    if not text1 or not text2:
-        return jsonify({'error': 'Missing text1 or text2'}), 400
-
-    # Add common words to ignore list
-    ignore_list.extend(common_words)
-
-    result = compare_texts(text1, text2, ignore_list, ignore_case)
-    return jsonify(result)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+print(compare_texts(text1, text2, []))
