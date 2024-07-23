@@ -24,6 +24,7 @@ const trackStudentRoutes = require('./routes/trackStudentRoute');
 
 //shubh result dashboard routes
 const subjectWiseDashboard = require('./routes/resultSummary');
+const supResultAdmin = require('./routes/result_super_admin_routes');
 
 const app = express();
 const PORT = 3000;
@@ -78,6 +79,7 @@ app.use(trackStudentRoutes)
 
 //result dashboard
 app.use(subjectWiseDashboard)
+app.use(supResultAdmin)
 
 
 app.use(express.static(path.join(__dirname, 'build')));

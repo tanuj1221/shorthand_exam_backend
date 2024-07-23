@@ -3,105 +3,61 @@ const StudentTableDTO = require('../../dto/studentTableDTO');
 const encryptionInterface = require('../../config/encrypt');
 
 exports.fetchUpdateTable = async (req, res) => {
-    const { student_id, subjectId, center, batchNo, tableName } = req.body;
+    const { student_id, expertId, status, subm_done, qset, subjectId, tableName } = req.body;
 
-    let studentQuery = `SELECT * FROM ??`;  // Using ?? for table name
+    let fetchQuery = `SELECT * FROM ??`;  // Using ?? for table name
     let queryParam = [tableName];
 
-    if(tableName === "students"){
-        if (center && batchNo) {
-            studentQuery += ' WHERE center = ? AND batchNo = ?';
-            queryParam.push(center, batchNo);
-        } else if (center && !batchNo) {
-            studentQuery += ' WHERE center = ?';
-            queryParam.push(center);
-        } else if (!center && batchNo) {
-            studentQuery += ' WHERE batchNo = ?';
-            queryParam.push(batchNo);
+    if(tableName === "expertreviewlogs"){
+        if (student_id) {
+            fetchQuery += ' WHERE student_id = ?';
+            queryParam.push(student_id);
+        } else if (expertId) {
+            fetchQuery += ' WHERE center = ?';
+            queryParam.push(expertId);
+        } else if (subm_done) {
+            fetchQuery += ' WHERE expertId = ?';
+            queryParam.push(subm_done);
+        }else if (qset) {
+            fetchQuery += ' WHERE qset = ?';
+            queryParam.push(qset);
+        }else if (status) {
+            fetchQuery += ' WHERE status = ?';
+            queryParam.push(status);
         }
     }else if(tableName === "audiologs"){
         if(student_id){
-            studentQuery += ' WHERE student_id = ?';
+            fetchQuery += ' WHERE student_id = ?';
             queryParam.push(student_id);
         }
     }else if(tableName === "studentlogs"){
         
         if(student_id && center){
-            studentQuery += ' WHERE student_id = ? AND center = ?';
+            fetchQuery += ' WHERE student_id = ? AND center = ?';
             queryParam.push(student_id, center);
         }else if(student_id){
-            studentQuery += ' WHERE student_id = ?';
+            fetchQuery += ' WHERE student_id = ?';
             queryParam.push(student_id);
         }else if(center){
-            studentQuery += ' WHERE center = ?';
+            fetchQuery += ' WHERE center = ?';
             queryParam.push(center);
         }
     }else if(tableName === 'textlogs'){
         if(student_id){
-            studentQuery += ' WHERE student_id = ?';
+            fetchQuery += ' WHERE student_id = ?';
             queryParam.push(student_id);
-        }
-    }else if(tableName === 'loginlogs'){
-        if(student_id){
-            studentQuery += ' WHERE student_id = ?';
-            queryParam.push(student_id);
-        }
-    }else if(tableName === 'batchdb'){
-        if(batchNo){
-            studentQuery += ' WHERE batchNo = ?';
-            queryParam.push(batchNo);
-        }
-    }else if(tableName === 'controllerdb'){
-        if(center && batchNo){
-            studentQuery += ' WHERE center = ? AND batchNo = ?';
-            queryParam.push(center, batchNo);
-        }else if(center){
-            studentQuery += ' WHERE center = ?';
-            queryParam.push(center);
-        }else if(batchNo){
-            studentQuery += ' WHERE batchNo = ?';
-            queryParam.push(batchNo);
-        }
-    }else if(tableName === 'examcenterdb'){
-        
-        if(center){
-            studentQuery += ' WHERE center = ?';
-            queryParam.push(center);
-        }
-    }else if(tableName === 'feedbackdb'){
-        if(student_id){
-            studentQuery += ' WHERE student_id = ?';
-            queryParam.push(student_id);
-        }
-    }else if(tableName === 'finalpassagesubmit'){
-        if(student_id){
-            studentQuery += ' WHERE student_id = ?';
-            queryParam.push(student_id);
-        }
-    }else if(tableName === 'pcregistration'){
-        if(center){
-            studentQuery += ' WHERE center = ?';
-            queryParam.push(center);
-        }
-    }else if(tableName === 'subjectdb'){
-        if(subjectId){
-            studentQuery += ' WHERE subjectId = ?';
-            queryParam.push(subjectId);
         }
     }
 
     try {
-        console.log("query: " + studentQuery);
+        console.log("query: " + fetchQuery);
         console.log("query parameters: ", queryParam);
-        const [results] = await connection.query(studentQuery, queryParam);
+        const [results] = await connection.query(fetchQuery, queryParam);
         
         //console.log(results);
         if (results.length > 0) {
-            const filteredResults = results.map(result => {
-                const { base64, ...filteredResult } = result;
-                return filteredResult;
-            });
-            res.status(200).json(filteredResults);
+            
+            res.status(200).json(results);
             //console.log(filteredResults);
         } else {
             res.status(404).send('No records found!');
