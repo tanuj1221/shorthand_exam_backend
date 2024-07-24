@@ -414,7 +414,7 @@ exports.removeFromIgnoreList = async (req, res) => {
         let currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
 
         // Remove the word from the list
-        currentIgnoreList = currentIgnoreList.filter(word => word !== wordToRemove);
+        currentIgnoreList = currentIgnoreList.filter(word => word.toLowerCase() !== wordToRemove.toLowerCase());
 
         // Join the list back into a comma-separated string
         const updatedIgnoreList = currentIgnoreList.join(', ');
@@ -429,7 +429,6 @@ exports.removeFromIgnoreList = async (req, res) => {
         await conn.query(updateQuery, [updatedIgnoreList, subjectId]);
         
         await conn.commit();
-        console.log(currentIgnoreList);
 
         res.status(200).json({ message: 'Word removed from ignore list', ignoreList: currentIgnoreList });
     } catch (err) {
