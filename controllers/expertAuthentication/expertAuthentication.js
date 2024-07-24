@@ -1,3 +1,5 @@
+
+
 // expertAuthentication.js
 const connection = require('../../config/db1');
 
@@ -271,46 +273,6 @@ exports.getPassagesByStudentId = async (req, res) => {
     }
 };
 
-exports.getIgnoredWords = async (req, res) => {
-    const { subjectId, qset, activePassage } = req.body;
-
-    // Input validation
-    if (!subjectId || !qset || !activePassage) {
-        return res.status(400).json({ error: 'Missing required parameters' });
-    }
-
-    try {
-        const columnName = `Q${qset}`;
-        
-        const query = `
-            SELECT ${columnName} AS ignoredWordsJson
-            FROM qsetdb
-            WHERE subject_id = ?
-        `;
-        
-        const [results] = await connection.query(query, [subjectId]);
-
-        if (results.length > 0 && results[0].ignoredWordsJson) {
-            let ignoredWordsArray;
-            try {
-                ignoredWordsArray = JSON.parse(results[0].ignoredWordsJson);
-            } catch (parseError) {
-                console.error("Error parsing JSON:", parseError);
-                return res.status(500).json({ error: 'Error parsing ignored words data' });
-            }
-            
-            // Extract the ignored words for the specific passage
-            const ignoredWords = ignoredWordsArray[activePassage - 1] || [];
-            res.status(200).json({ ignoredWords });
-        } else {
-            res.status(200).json({ ignoredWords: [] });
-        }
-    } catch (err) {
-        console.error("Error fetching ignored words:", err);
-        res.status(500).json({ error: 'Error fetching ignored words' });
-    }
-};
-
 exports.getIgnoreList = async (req, res) => {
     // Uncomment if authentication is required
     // if (!req.session.expertId) {
@@ -478,10 +440,6 @@ exports.removeFromIgnoreList = async (req, res) => {
         if (conn) conn.release();
     }
 };
-
-
-
-
 
 // Functions to check the expert logged in status
 exports.logoutExpert = async (req, res) => {

@@ -14,7 +14,6 @@ router.post('/assignStudent/:subjectId/:qset', examExpertAdminController.assignS
 router.post('/active-passage',examExpertAdminController.getIgnoreList)
 router.post('/add-ignore-word',examExpertAdminController.addToIgnoreList)
 router.post('/undo-word',examExpertAdminController.removeFromIgnoreList)
-router.post('/ignored-words', examExpertAdminController.getIgnoredWords);
 
 router.post('/get-student-passages', examExpertAdminController.getPassagesByStudentId);  // Make sure the function name matches
 
