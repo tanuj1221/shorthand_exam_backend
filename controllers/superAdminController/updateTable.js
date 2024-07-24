@@ -58,8 +58,7 @@ exports.updateTable = async (req, res) => {
             res.status(404).send("No records found to update.");
             
         } else {
-            res.status(200).send("Update successful.");
-            
+            res.status(200).send("Update successful.");  
         }
     }catch(err){
         console.error("Error executing query:", err.message);
