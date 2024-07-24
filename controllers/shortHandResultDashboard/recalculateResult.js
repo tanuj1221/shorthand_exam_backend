@@ -6,6 +6,8 @@ const progressEmitter = new EventEmitter();
 
 exports.recalculateResults = async (req, res) => {
     try {
+        
+
         const selectQuery = `SELECT * FROM processed_withignore`;
         const [rows] = await connection.query(selectQuery);
         let countRow = 0;
