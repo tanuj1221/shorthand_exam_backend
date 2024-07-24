@@ -1,5 +1,3 @@
-
-
 // expertAuthentication.js
 const connection = require('../../config/db1');
 
@@ -246,6 +244,73 @@ exports.getExpertAssignedPassages = async (req, res) => {
     }
 };
 
+exports.getPassagesByStudentId = async (req, res) => {
+    if (!req.session.expertId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { studentId } = req.body;  // Changed from req.params to req.body
+
+    try {
+        const query = `
+            SELECT passageA, passageB, ansPassageA, ansPassageB, student_id, subjectId, qset
+            FROM expertreviewlog 
+            WHERE student_id = ?
+        `;
+        const [results] = await connection.query(query, [studentId]);
+
+        if (results.length > 0) {
+            console.log("Assigned student_id:", results[0].student_id);
+            res.status(200).json(results[0]);
+        } else {
+            res.status(404).json({ error: 'No assigned passages found' });
+        }
+    } catch (err) {
+        console.error("Error fetching assigned passages:", err);
+        res.status(500).json({ error: 'Error fetching assigned passages' });
+    }
+};
+
+exports.getIgnoredWords = async (req, res) => {
+    const { subjectId, qset, activePassage } = req.body;
+
+    // Input validation
+    if (!subjectId || !qset || !activePassage) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    try {
+        const columnName = `Q${qset}`;
+        
+        const query = `
+            SELECT ${columnName} AS ignoredWordsJson
+            FROM qsetdb
+            WHERE subject_id = ?
+        `;
+        
+        const [results] = await connection.query(query, [subjectId]);
+
+        if (results.length > 0 && results[0].ignoredWordsJson) {
+            let ignoredWordsArray;
+            try {
+                ignoredWordsArray = JSON.parse(results[0].ignoredWordsJson);
+            } catch (parseError) {
+                console.error("Error parsing JSON:", parseError);
+                return res.status(500).json({ error: 'Error parsing ignored words data' });
+            }
+            
+            // Extract the ignored words for the specific passage
+            const ignoredWords = ignoredWordsArray[activePassage - 1] || [];
+            res.status(200).json({ ignoredWords });
+        } else {
+            res.status(200).json({ ignoredWords: [] });
+        }
+    } catch (err) {
+        console.error("Error fetching ignored words:", err);
+        res.status(500).json({ error: 'Error fetching ignored words' });
+    }
+};
+
 exports.getIgnoreList = async (req, res) => {
     // Uncomment if authentication is required
     // if (!req.session.expertId) {
@@ -414,31 +479,9 @@ exports.removeFromIgnoreList = async (req, res) => {
     }
 };
 
-exports.getStudentPassages = async (req, res) => {
-    if (!req.session.expertId) {
-        return res.status(401).json({error: 'Unauthorized'});
-    }
-    const { studentId } = req.body;
 
-    try{
-        const query = `
-        SELECT subjectId, qset
-        FROM expertreviewlog
-        WHERE student_id = ?
-        LIMIT 1
-        `;
-        const [results] = await connection.query(query, [studentId]);
 
-        if (results.length > 0) {
-            res.status(200).json(results[0]);
-        } else {
-            res.status(404).json({ error: 'No matching record found' });
-        }
-    } catch (err) {
-        console.error("Error fetching student details:", err);
-        res.status(500).json({ error: 'Error fetching student details' });
-    }
-}
+
 
 // Functions to check the expert logged in status
 exports.logoutExpert = async (req, res) => {
@@ -522,4 +565,47 @@ exports.submitPassageReview = async (req, res) => {
     }
 };
 
+// exports.submitPassageByStudentId = async (req, res) => {
+//     if (!req.session.expertId) {
+//         return res.status(401).json({ error: 'Unauthorized' });
+//     }
+
+//     const { studentId } = req.params;
+
+//     let conn;
+//     try {
+//         conn = await connection.getConnection();
+//         await conn.beginTransaction();
+
+//         // Update the expertreviewlog table
+//         const updateQuery = `
+//             UPDATE expertreviewlog 
+//             SET subm_done = 1, subm_time = NOW()
+//             WHERE student_id = ? AND student_id IS NOT NULL
+//         `;
+//         await conn.query(updateQuery, [studentId]);
+
+//         // Fetch the updated record
+//         const selectQuery = `
+//             SELECT student_id, subm_done, subm_time
+//             FROM expertreviewlog
+//             WHERE student_id = ?
+//         `;
+//         const [results] = await conn.query(selectQuery, [studentId]);
+
+//         if (results.length === 0) {
+//             await conn.rollback();
+//             return res.status(404).json({ error: 'No matching record found' });
+//         }
+
+//         await conn.commit();
+//         res.status(200).json(results[0]);
+//     } catch (err) {
+//         if (conn) await conn.rollback();
+//         console.error("Error submitting passage review:", err);
+//         res.status(500).json({ error: 'Error submitting passage review' });
+//     } finally {
+//         if (conn) conn.release();
+//     }
+// };
 
