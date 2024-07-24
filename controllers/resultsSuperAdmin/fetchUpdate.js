@@ -3,7 +3,7 @@ const StudentTableDTO = require('../../dto/studentTableDTO');
 const encryptionInterface = require('../../config/encrypt');
 
 exports.fetchUpdateTable = async (req, res) => {
-    const { student_id, expertId, status, subm_done, qset, subjectId, tableName } = req.body;
+    const { student_id, expertId, status, subm_done, qset, subjectId, subject_id, tableName } = req.body;
 
     let fetchQuery = `SELECT * FROM ??`;  // Using ?? for table name
     let queryParam = [tableName];
@@ -25,27 +25,11 @@ exports.fetchUpdateTable = async (req, res) => {
             fetchQuery += ' WHERE status = ?';
             queryParam.push(status);
         }
-    }else if(tableName === "audiologs"){
-        if(student_id){
-            fetchQuery += ' WHERE student_id = ?';
-            queryParam.push(student_id);
-        }
-    }else if(tableName === "studentlogs"){
+    }else if(tableName === "qsetdb"){
         
-        if(student_id && center){
-            fetchQuery += ' WHERE student_id = ? AND center = ?';
-            queryParam.push(student_id, center);
-        }else if(student_id){
-            fetchQuery += ' WHERE student_id = ?';
-            queryParam.push(student_id);
-        }else if(center){
-            fetchQuery += ' WHERE center = ?';
-            queryParam.push(center);
-        }
-    }else if(tableName === 'textlogs'){
-        if(student_id){
-            fetchQuery += ' WHERE student_id = ?';
-            queryParam.push(student_id);
+        if(subject_id){
+            fetchQuery += ' WHERE subject_id = ?';
+            queryParam.push(subject_id);
         }
     }
 
