@@ -136,7 +136,9 @@ const schema = {
         loggedin: 'DATETIME',
         status: 'BOOLEAN',
         subm_done: 'BOOLEAN',
-        subm_time: 'DATETIME'
+        subm_time: 'DATETIME',
+        QPA: 'TEXT',
+        QPB: 'TEXT'
     },
     subjectsdb: {
         subjectId: 'INT PRIMARY KEY',

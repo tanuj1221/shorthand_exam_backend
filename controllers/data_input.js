@@ -137,16 +137,11 @@ async function insertChunk(tableName, columns, chunk) {
         }
       }
 
-      // Process loggedin and done columns
-      if (column === 'loggedin' || column === 'done') {
-        return value && (value.toLowerCase() === 'yes' || value.toLowerCase() === 'true' || value === '1');
-      }
-
-      // Process time columns
-      if (fieldType === 'TIME') {
+      // Process datetime columns (including loggedin and subm_time)
+      if (fieldType === 'DATETIME' || column === 'loggedin' || column === 'subm_time') {
         if (value) {
-          const time = moment(value, ['h:mm A', 'HH:mm']);
-          return time.isValid() ? time.format('HH:mm:ss') : null;
+          const date = moment(value, ['M/D/YYYY H:mm', 'YYYY-MM-DD HH:mm:ss']);
+          return date.isValid() ? date.format('YYYY-MM-DD HH:mm:ss') : null;
         }
         return null;
       }
@@ -158,9 +153,9 @@ async function insertChunk(tableName, columns, chunk) {
       } else if (fieldType === 'DECIMAL') {
         return isNaN(parseFloat(value)) ? null : parseFloat(value);
       } else if (fieldType === 'DATE') {
-        return value ? new Date(value) : null;
+        return value ? moment(value).format('YYYY-MM-DD') : null;
       } else if (fieldType === 'TIMESTAMP') {
-        return value ? new Date(value) : null;
+        return value ? moment(value).format('YYYY-MM-DD HH:mm:ss') : null;
       } else {
         return value;
       }
