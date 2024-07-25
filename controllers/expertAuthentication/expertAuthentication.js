@@ -344,13 +344,13 @@ exports.addToIgnoreList = async (req, res) => {
 
         let currentIgnoreList = [];
         if (results.length > 0 && results[0].ignoreList) {
-            currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
+          currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
         }
 
         // Add the new word if it's not already in the list
         if (!currentIgnoreList.includes(newWord)) {
-            currentIgnoreList.push(newWord);
-        }
+            currentIgnoreList.unshift(newWord);
+          }
 
         // Join the list back into a comma-separated string
         const updatedIgnoreList = currentIgnoreList.join(', ');

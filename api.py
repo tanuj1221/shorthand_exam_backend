@@ -25,7 +25,7 @@ def tokenize_text(text, language):
 def is_word(token):
     return bool(re.match(r'\S+', token))
 
-def compare_texts(text1, text2, ignore_list):
+def compare_texts(text1, text2, ignore_list, ignore_case=False):
     added = []
     missed = []
     spelling = []
@@ -117,12 +117,13 @@ def compare():
     text1 = data.get('text1')
     text2 = data.get('text2')
     ignore_list = data.get('ignore_list', [])
+    ignore_case = data.get('ignore_case', False)  # Get the ignore_case value from the request data
     print(ignore_list)
 
     if not text1 or not text2:
         return jsonify({'error': 'Missing text1 or text2'}), 400
 
-    result = compare_texts(text1, text2, ignore_list)
+    result = compare_texts(text1, text2, ignore_list, ignore_case)  # Pass ignore_case to the function
     return jsonify(result)
 
 if __name__ == '__main__':
