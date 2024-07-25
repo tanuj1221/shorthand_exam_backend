@@ -34,7 +34,7 @@ app.use(express.static(path.join(__dirname, 'build')));
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' http://43.204.22.53:5000;"
+    "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' http://43.204.22.53:5000;"
   );
   next();
 });
