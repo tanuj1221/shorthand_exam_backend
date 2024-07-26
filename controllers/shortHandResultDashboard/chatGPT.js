@@ -2,81 +2,55 @@ const { min } = require('moment-timezone');
 const connection = require('../../config/db1');
 const { EventEmitter } = require('events');
 const axios = require('axios');
-const axiosRetry = require('axios-retry').default;
 const { Pool } = require('pg');
 
 const progressEmitter = new EventEmitter();
-
-// Configure axios-retry
-axiosRetry(axios, {
-  retries: 3, // Number of retries
-  retryDelay: (retryCount) => {
-    return retryCount * 1000; // Delay between retries in milliseconds
-  },
-  retryCondition: (error) => {
-    return error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED';
-  },
-});
 
 exports.recalculateResults = async (req, res) => {
   try {
     const subjectIdReq = req.params.subject_id;
 
     const selectQuery = `
-      SELECT 
-        pw.student_id,
-        pw.passageA,
-        pw.passageB, 
-        pw.ansPassageA,
-        pw.ansPassageB,
-        pw.qset,
-        s.subjectsId,
-        qdb.Q1PA, qdb.Q1PB, qdb.Q2PA, qdb.Q2PB, qdb.Q3PA, qdb.Q3PB, qdb.Q4PA, qdb.Q4PB
-      FROM 
-        processed_withignore pw
-      INNER JOIN 
-        students s ON pw.student_id = s.student_id
-      INNER JOIN 
-        qsetdb qdb ON JSON_CONTAINS(s.subjectsId, CAST(qdb.subject_id AS JSON), '$')
-      WHERE 
-        pw.subjectsId = ?
+            SELECT 
+            pw.student_id, 
+            s.subjectsId,
+            qdb.Q1PA, qdb.Q1PB, qdb.Q2PA, qdb.Q2PB, qdb.Q3PA, qdb.Q3PB, qdb.Q4PA, qdb.Q4PB
+        FROM 
+            processed_withignore pw
+        INNER JOIN 
+            students s ON pw.student_id = s.student_id
+        INNER JOIN 
+            qsetdb qdb ON JSON_CONTAINS(s.subjectsId, CAST(qdb.subject_id AS JSON), '$')
+        WHERE 
+            pw.subjectsId = ?
     `;
     const [rows] = await connection.query(selectQuery, [subjectIdReq]);
-
+    
     const updateStatements = [];
     const apiCalls = [];
-    let count = 0;
+
     for (const row of rows) {
-        count++;
-        console.log("api call: "+count);
       const { student_id, passageA, passageB, ansPassageA, ansPassageB, qset } = row;
       
       const qpaList = row[`Q${qset}PA`];
       const qpbList = row[`Q${qset}PB`];
 
-      //console.log("qpaList: "+ qpaList);
-      //console.log("qpbList: "+qpbList);
-      console.log("student_id: "+student_id);
-      if (qpaList && qpbList && passageA && ansPassageA && passageB && ansPassageB) {
-        const ignore = qpaList.concat(qpbList);
+      const ignore = qpaList.concat(qpbList);
 
-        apiCalls.push(
-          axios.post('http://localhost:5000/compare', {
-            text1: passageA,
-            text2: ansPassageA,
-            ignore_list: qpaList ? qpaList.split(',') : []
-          }, { timeout: 20000 }), // Increased timeout to 20 seconds
-          axios.post('http://localhost:5000/compare', {
-            text1: passageB,
-            text2: ansPassageB,
-            ignore_list: qpbList ? qpbList.split(',') : []
-          }, { timeout: 20000 }) // Increased timeout to 20 seconds
-        );
+      apiCalls.push(
+        axios.post('http://localhost:5000/compare', {
+          text1: passageA,
+          text2: ansPassageA,
+          ignore_list: [qpaList]
+        }),
+        axios.post('http://localhost:5000/compare', {
+          text1: passageB,
+          text2: ansPassageB,
+          ignore_list: [qpbList]
+        })
+      );
 
-        updateStatements.push([0, 0, 0, 0, 0, 0, '', student_id]);
-      } else {
-        console.warn(`Missing qpaList or qpbList for student_id: ${student_id}`);
-      }
+      updateStatements.push([0, 0, 0, 0, 0, 0, '', student_id]);
     }
 
     try {
@@ -99,28 +73,20 @@ exports.recalculateResults = async (req, res) => {
         updateStatements[i / 2] = [mistakeCountA, mistakeCountB, Marks_A, Marks_B, Marks_Total, minOfAB, result, rows[i / 2].student_id];
       }
     } catch (apiError) {
-      if (apiError.code === 'ETIMEDOUT' || apiError.code === 'ECONNREFUSED') {
-        console.error('Connection error:', apiError);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to connect to the API server. Please try again later.',
-        });
-      } else {
-        console.error('Error in API calls:', apiError);
-        throw apiError;
-      }
+      console.error('Error in API calls:', apiError);
+      throw apiError;
     }
 
     const updateQuery = `
       UPDATE processed_withignore
-      SET Mistake_Count_A = ?,
-          Mistake_Count_B = ?,
-          Marks_A = ?,
-          Marks_B = ?,
-          Marks_Total = ?,
-          Min = ?,
-          Result = ?
-      WHERE student_id = ?
+      SET Mistake_Count_A = VALUES(Mistake_Count_A),
+          Mistake_Count_B = VALUES(Mistake_Count_B),
+          Marks_A = VALUES(Marks_A),
+          Marks_B = VALUES(Marks_B),
+          Marks_Total = VALUES(Marks_Total),
+          Min = VALUES(Min),
+          Result = VALUES(Result)
+      WHERE student_id = VALUES(student_id)
     `;
 
     try {

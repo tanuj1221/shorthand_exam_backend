@@ -25,6 +25,7 @@ const trackStudentRoutes = require('./routes/trackStudentRoute');
 //shubh result dashboard routes
 const subjectWiseDashboard = require('./routes/resultSummary');
 const supResultAdmin = require('./routes/result_super_admin_routes');
+const comparePythonService = require('./routes/compare_texts');
 
 const app = express();
 const PORT = 3000;
@@ -80,6 +81,8 @@ app.use(trackStudentRoutes)
 //result dashboard
 app.use(subjectWiseDashboard)
 app.use(supResultAdmin)
+app.use(comparePythonService)
+
 
 
 app.use(express.static(path.join(__dirname, 'build')));
@@ -91,6 +94,11 @@ app.get('*', (req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send('Something broke!');
+});
+
+app.use((req, res, next) => {
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' blob:;");
+  next();
 });
 
 app.listen(PORT, '0.0.0.0', () => {

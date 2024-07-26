@@ -3,6 +3,7 @@ const StudentTableDTO = require('../../dto/studentTableDTO');
 const encryptionInterface = require('../../config/encrypt');
 
 exports.fetchUpdateTable = async (req, res) => {
+    
     const { student_id, expertId, status, subm_done, qset, subjectId, subject_id, tableName } = req.body;
 
     let fetchQuery = `SELECT * FROM ??`;  // Using ?? for table name

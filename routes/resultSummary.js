@@ -5,7 +5,7 @@ const getResultSummarySubjectWise = require('./../controllers/shortHandResultDas
 const recalculate = require('./../controllers/shortHandResultDashboard/recalculateResult');
 
 router.get('/subjectid-wise-result-summary', getResultSummarySubjectWise.resultSummary);
-router.get('/recalculate-result', recalculate.recalculateResults);
+router.get('/recalculate-result/:subject_id', recalculate.recalculateResults);
 router.get('/recalculate-progress', recalculate.getProgress);
 
 module.exports = router;
