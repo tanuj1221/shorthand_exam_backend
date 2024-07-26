@@ -173,8 +173,30 @@ exports.assignStudentForQSet = async (req, res) => {
             }
         }
 
+        const fetchIgnoreListsQuery = `
+            SELECT Q${qset}PA as QPA, Q${qset}PB as QPB
+            FROM qsetdb
+            WHERE subject_id = ?
+        `;
+        const [ignoreListsResult] = await conn.query(fetchIgnoreListsQuery, [subjectId]);
+
+        if (ignoreListsResult.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Ignore lists not found for this subject and qset' });
+        }
+
+        const { QPA, QPB } = ignoreListsResult[0];
+
+        // Update the expertreviewlog with the ignore lists
+        const updateIgnoreListsQuery = `
+            UPDATE expertreviewlog
+            SET QPA = ?, QPB = ?
+            WHERE student_id = ? AND subjectId = ? AND qset = ? AND expertId = ?
+        `;
+        await conn.query(updateIgnoreListsQuery, [QPA, QPB, student_id, subjectId, qset, expertId]);
+
         await conn.commit();
-        res.status(200).json({ qset, student_id, loggedin, status, subm_done, subm_time });
+        res.status(200).json({ qset, student_id, loggedin, status, subm_done, subm_time, QPA, QPB });
     } catch (err) {
         if (conn) await conn.rollback();
         console.error("Error assigning student for QSet:", err);
