@@ -1,114 +1,77 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import re
 import difflib
-from Levenshtein import distance as levenshtein_distance
-import nltk
-from nltk.tokenize import word_tokenize
-from langdetect import detect
-
-# Download the necessary resources
-nltk.download('punkt')
+import re
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins='*')
 
-def tokenize_text(text, language):
-    if language in ['hi', 'mar']:
-        # For Hindi and Marathi, split on whitespace and punctuation
-        return re.findall(r'\S+', text)
-    elif language == 'en':
-        return word_tokenize(text)
-    else:
-        return text.split()
-
-def is_word(token):
-    return bool(re.match(r'\S+', token))
+def tokenize(text):
+    return re.findall(r'\S+|\s+', text)
 
 def compare_texts(text1, text2, ignore_list, ignore_case=False):
-    added = []
-    missed = []
-    spelling = []
-    grammar = []
-    colored_words = []
-
     if ignore_case:
         text1 = text1.lower()
         text2 = text2.lower()
         ignore_list = [word.lower() for word in ignore_list]
 
-    words1 = text1.split()
-    words2 = text2.split()
+    tokens1 = tokenize(text1)
+    tokens2 = tokenize(text2)
 
-    s = difflib.SequenceMatcher(None, words1, words2)
-    opcodes = s.get_opcodes()
+    matcher = difflib.SequenceMatcher(None, tokens1, tokens2)
+    opcodes = matcher.get_opcodes()
 
-    
+    colored_words = []
+    added = []
+    missed = []
+    changed = []
+
     for tag, i1, i2, j1, j2 in opcodes:
         if tag == 'equal':
-            for word in words1[i1:i2]:
-                colored_words.append({'word': word, 'color': 'black'})
+            for token in tokens1[i1:i2]:
+                colored_words.append({'word': token, 'color': 'black'})
         elif tag == 'delete':
-            for word in words1[i1:i2]:
-                if word.lower() not in ignore_list:
-                    colored_words.append({'word': word, 'color': 'red'})
-                    missed.append(word)
+            for token in tokens1[i1:i2]:
+                if token.strip() and token.lower() not in ignore_list:
+                    colored_words.append({'word': token, 'color': 'red'})
+                    missed.append(token.strip())
                 else:
-                    colored_words.append({'word': word, 'color': 'black'})
+                    colored_words.append({'word': token, 'color': 'black'})
         elif tag == 'insert':
-            for word in words2[j1:j2]:
-                if word.lower() not in ignore_list:
-                    colored_words.append({'word': word, 'color': 'green'})
-                    added.append(word)
+            for token in tokens2[j1:j2]:
+                if token.strip() and token.lower() not in ignore_list:
+                    colored_words.append({'word': token, 'color': 'green'})
+                    added.append(token.strip())
                 else:
-                    colored_words.append({'word': word, 'color': 'black'})
+                    colored_words.append({'word': token, 'color': 'black'})
         elif tag == 'replace':
-            for old, new in zip(words1[i1:i2], words2[j1:j2]):
-                dist = levenshtein_distance(old.lower(), new.lower())
-                max_len = max(len(old), len(new))
-                similarity = (max_len - dist) / max_len * 100
-
-                old_no_punct = re.sub(r'[^\w\s]', '', old)
-                new_no_punct = re.sub(r'[^\w\s]', '', new)
-
+            old_words = [t for t in tokens1[i1:i2] if t.strip()]
+            new_words = [t for t in tokens2[j1:j2] if t.strip()]
+            
+            for old, new in zip(old_words, new_words):
                 if old.lower() in ignore_list or new.lower() in ignore_list:
                     colored_words.append({'word': new, 'color': 'black'})
-                elif old.lower() == new.lower():
-                    colored_words.append({'word': old, 'color': 'black'})
-                elif similarity > 50 and old_no_punct.lower() != new_no_punct.lower():
-                    colored_words.append({'word': old, 'color': 'red'})
-                    colored_words.append({'word': new, 'color': 'green'})
-                    spelling.append((old, new))
-                elif old_no_punct.lower() == new_no_punct.lower():
-                    colored_words.append({'word': old, 'color': 'red'})
-                    colored_words.append({'word': new, 'color': 'green'})
-                    grammar.append((old, new))
                 else:
                     colored_words.append({'word': old, 'color': 'red'})
                     colored_words.append({'word': new, 'color': 'green'})
-                    missed.append(old)
-                    added.append(new)
-
-
-        for word in words1[i1+len(words2[j1:j2]):i2]:
-                if word.lower() not in ignore_list:
-                    colored_words.append({'word': word, 'color': 'red'})
-                    missed.append(word)
-
-        for word in words2[j1+len(words1[i1:i2]):j2]:
-                colored_words.append({'word': word, 'color': 'green'})
-                if word.lower() not in ignore_list:
-                    added.append(word)
-
-
-
+                    changed.append((old, new))
+            
+            if len(old_words) > len(new_words):
+                for word in old_words[len(new_words):]:
+                    if word.lower() not in ignore_list:
+                        colored_words.append({'word': word, 'color': 'red'})
+                        missed.append(word)
+            elif len(new_words) > len(old_words):
+                for word in new_words[len(old_words):]:
+                    if word.lower() not in ignore_list:
+                        colored_words.append({'word': word, 'color': 'green'})
+                        added.append(word)
 
     return {
         'colored_words': colored_words,
         'missed': missed,
         'added': added,
-        'spelling': spelling,
-        'grammar': grammar
+        'changed': changed
     }
 
 @app.route('/compare', methods=['POST'])
@@ -117,13 +80,12 @@ def compare():
     text1 = data.get('text1')
     text2 = data.get('text2')
     ignore_list = data.get('ignore_list', [])
-    ignore_case = data.get('ignore_case', False)  # Get the ignore_case value from the request data
-    print(ignore_list)
+    ignore_case = data.get('ignore_case', False)
 
     if not text1 or not text2:
         return jsonify({'error': 'Missing text1 or text2'}), 400
 
-    result = compare_texts(text1, text2, ignore_list, ignore_case)  # Pass ignore_case to the function
+    result = compare_texts(text1, text2, ignore_list, ignore_case)
     return jsonify(result)
 
 if __name__ == '__main__':
