@@ -277,6 +277,35 @@ exports.getExpertAssignedPassages = async (req, res) => {
     }
 };
 
+exports.getStudentPassages = async (req, res) => {
+    console.log("getStudentPassages called with params:", req.params);
+    if (!req.session.expertId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { subjectId, qset, studentId } = req.params;
+
+    try {
+        const query = `
+            SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
+            FROM expertreviewlog 
+            WHERE subjectId = ? AND qset = ? AND student_id = ?
+            LIMIT 1
+        `;
+        const [results] = await connection.query(query, [subjectId, qset, studentId]);
+
+        if (results.length > 0) {
+            console.log("Fetched student_id:", results[0].student_id);
+            res.status(200).json(results[0]);
+        } else {
+            res.status(404).json({ error: 'No passages found for this student' });
+        }
+    } catch (err) {
+        console.error("Error fetching student passages:", err);
+        res.status(500).json({ error: 'Error fetching student passages' });
+    }
+};
+
 exports.getPassagesByStudentId = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -303,6 +332,7 @@ exports.getPassagesByStudentId = async (req, res) => {
         res.status(500).json({ error: 'Error fetching assigned passages' });
     }
 };
+
 
 exports.getIgnoreList = async (req, res) => {
     if (!req.session.expertId) {

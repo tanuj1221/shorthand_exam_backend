@@ -8,14 +8,16 @@ router.get('/expert-details', examExpertAdminController.getExpertDetails);
 router.get('/all-subjects', examExpertAdminController.getAllSubjects);
 router.get('/qsets/:subjectId', examExpertAdminController.getQSetsForSubject); 
 router.get('/expert-assigned-passages/:subjectId/:qset', examExpertAdminController.getExpertAssignedPassages);
+router.get('/student-passages/:subjectId/:qset/:studentId', examExpertAdminController.getStudentPassages);
 
 router.post('/assignStudent/:subjectId/:qset', examExpertAdminController.assignStudentForQSet);
 
-router.post('/active-passage',examExpertAdminController.getIgnoreList)
-router.post('/add-ignore-word',examExpertAdminController.addToIgnoreList)
-router.post('/undo-word',examExpertAdminController.removeFromIgnoreList)
+router.post('/active-passage',examExpertAdminController.getIgnoreList);
 
 router.post('/get-student-passages', examExpertAdminController.getPassagesByStudentId);  // Make sure the function name matches
+
+router.post('/add-ignore-word',examExpertAdminController.addToIgnoreList);
+;router.post('/undo-word',examExpertAdminController.removeFromIgnoreList);
 
 router.post('/expert-logout', examExpertAdminController.logoutExpert);
 
