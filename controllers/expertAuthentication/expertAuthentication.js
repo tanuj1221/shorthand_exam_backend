@@ -333,7 +333,7 @@ exports.getPassagesByStudentId = async (req, res) => {
     }
 };
 
-
+// Ignore list functions
 exports.getIgnoreList = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -359,6 +359,92 @@ exports.getIgnoreList = async (req, res) => {
         `;
         
         const [results] = await connection.query(query, [subjectId, qset, expertId]);
+
+        if (results.length > 0) {
+            const { ignoreList, student_id } = results[0];
+            
+            if (ignoreList) {
+                // Split the ignore list string into an array
+                const ignoreListArray = ignoreList.split(',').map(item => item.trim());
+                
+                console.log(`Fetched ignore list for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
+                console.log(`Table: expertreviewlog, Column: ${columnName}`);
+                console.log(`Ignore list: ${ignoreListArray.join(', ')}`);
+                
+                res.status(200).json({ 
+                    ignoreList: ignoreListArray,
+                    debug: {
+                        expertId,
+                        student_id,
+                        subjectId,
+                        qset,
+                        activePassage,
+                        table: 'expertreviewlog',
+                        column: columnName
+                    }
+                });
+            } else {
+                console.log(`No ignore list found for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
+                console.log(`Table: expertreviewlog, Column: ${columnName}`);
+                res.status(404).json({ 
+                    error: 'No ignore list found',
+                    debug: {
+                        expertId,
+                        student_id,
+                        subjectId,
+                        qset,
+                        activePassage,
+                        table: 'expertreviewlog',
+                        column: columnName
+                    }
+                });
+            }
+        } else {
+            console.log(`No record found for expertId: ${expertId}, subjectId: ${subjectId}, qset: ${qset}`);
+            console.log(`Table: expertreviewlog, Column: ${columnName}`);
+            res.status(404).json({ 
+                error: 'No record found',
+                debug: {
+                    expertId,
+                    subjectId,
+                    qset,
+                    activePassage,
+                    table: 'expertreviewlog',
+                    column: columnName
+                }
+            });
+        }
+    } catch (err) {
+        console.error("Error fetching ignore list:", err);
+        res.status(500).json({ error: 'Error fetching ignore list' });
+    }
+};
+
+exports.getStudentIgnoreList = async (req, res) => {
+    if (!req.session.expertId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { subjectId, qset, activePassage, studentId } = req.body;
+    const expertId = req.session.expertId;
+
+    // Input validation
+    if (!subjectId || !qset || !activePassage) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    try {
+        const columnName = activePassage === 'A' ? 'QPA' : 'QPB';
+        
+        const query = `
+            SELECT ${columnName} AS ignoreList, student_id
+            FROM expertreviewlog
+            WHERE subjectId = ? AND qset = ? AND student_id = ?
+            ORDER BY loggedin DESC
+            LIMIT 1
+        `;
+        
+        const [results] = await connection.query(query, [subjectId, qset, studentId]);
 
         if (results.length > 0) {
             const { ignoreList, student_id } = results[0];
