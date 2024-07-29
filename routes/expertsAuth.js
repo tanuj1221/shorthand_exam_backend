@@ -18,7 +18,10 @@ router.post('/active-passage',examExpertAdminController.getIgnoreList);
 router.post('/student-active-passage', examExpertAdminController.getStudentIgnoreList);
 
 router.post('/add-ignore-word',examExpertAdminController.addToIgnoreList);
-router.post('/undo-word',examExpertAdminController.removeFromIgnoreList);
+router.post('/student-add-ignore-word',examExpertAdminController.addToStudentIgnoreList);
+
+router.post('/undo-word', examExpertAdminController.removeFromIgnoreList);
+router.post('/student-undo-word',  examExpertAdminController.removeFromStudentIgnoreList);
 
 
 router.post('/submit-passage-review/:subjectId/:qset', examExpertAdminController.submitPassageReview);
