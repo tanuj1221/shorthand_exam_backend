@@ -924,47 +924,4 @@ exports.submitPassageReview = async (req, res) => {
     }
 };
 
-// exports.submitPassageByStudentId = async (req, res) => {
-//     if (!req.session.expertId) {
-//         return res.status(401).json({ error: 'Unauthorized' });
-//     }
-
-//     const { studentId } = req.params;
-
-//     let conn;
-//     try {
-//         conn = await connection.getConnection();
-//         await conn.beginTransaction();
-
-//         // Update the expertreviewlog table
-//         const updateQuery = `
-//             UPDATE expertreviewlog 
-//             SET subm_done = 1, subm_time = NOW()
-//             WHERE student_id = ? AND student_id IS NOT NULL
-//         `;
-//         await conn.query(updateQuery, [studentId]);
-
-//         // Fetch the updated record
-//         const selectQuery = `
-//             SELECT student_id, subm_done, subm_time
-//             FROM expertreviewlog
-//             WHERE student_id = ?
-//         `;
-//         const [results] = await conn.query(selectQuery, [studentId]);
-
-//         if (results.length === 0) {
-//             await conn.rollback();
-//             return res.status(404).json({ error: 'No matching record found' });
-//         }
-
-//         await conn.commit();
-//         res.status(200).json(results[0]);
-//     } catch (err) {
-//         if (conn) await conn.rollback();
-//         console.error("Error submitting passage review:", err);
-//         res.status(500).json({ error: 'Error submitting passage review' });
-//     } finally {
-//         if (conn) conn.release();
-//     }
-// };
 
