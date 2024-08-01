@@ -1,6 +1,7 @@
 // expertAuthentication.js
 const connection = require('../../config/db1');
 
+// Authentication functions
 exports.loginExpertAdmin = async (req, res) => {
     console.log("Trying expert admin login");
     const { expertId, password } = req.body;
@@ -36,6 +37,41 @@ exports.loginExpertAdmin = async (req, res) => {
     }
 };
 
+exports.logoutExpert = async (req, res) => {
+    if (!req.session.expertId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const expertId = req.session.expertId;
+
+    let conn;
+    try {
+        conn = await connection.getConnection();
+
+        const updateStatusQuery = `
+            UPDATE expertreviewlog 
+            SET status = 0
+            WHERE expertId = ?
+        `;
+        await conn.query(updateStatusQuery, [expertId]);
+
+        // Clear the session
+        req.session.destroy((err) => {
+            if (err) {
+                console.error("Error destroying session:", err);
+                return res.status(500).json({ error: 'Error logging out' });
+            }
+            res.status(200).json({ message: 'Logged out successfully' });
+        });
+
+    } catch (err) {
+        console.error("Error logging out expert:", err);
+        res.status(500).json({ error: 'Error logging out' });
+    } finally {
+        if (conn) conn.release();
+    }
+};
+
 exports.getExpertDetails = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -47,6 +83,7 @@ exports.getExpertDetails = async (req, res) => {
     });
 };
 
+// Subject and QSet management functions
 exports.getAllSubjects = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -77,6 +114,69 @@ exports.getAllSubjects = async (req, res) => {
     }
 };
 
+exports.getQSetsForSubject = async (req, res) => {
+    if (!req.session.expertId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { subjectId } = req.params;
+
+    try {
+        const qsetQuery = `
+            SELECT qset, COUNT(DISTINCT student_id) as student_count
+            FROM expertreviewlog 
+            WHERE subjectId = ?
+            GROUP BY qset
+            HAVING student_count > 0
+            ORDER BY qset
+        `;
+        const [qsetResults] = await connection.query(qsetQuery, [subjectId]);
+
+        console.log(`QSets for subject ${subjectId} with student counts:`);
+        qsetResults.forEach(qset => {
+            console.log(`QSet: ${qset.qset}, Student Count: ${qset.student_count}`);
+        });
+
+        // const availableQSets = qsetResults.map(qsetObj => qsetObj.qset);
+
+        res.status(200).json(qsetResults);
+    } catch (err) {
+        console.error("Error fetching qsets:", err);
+        res.status(500).json({ error: 'Error fetching qsets' });
+    }
+};
+
+// Expert assignment and passage retrieval routes
+exports.getExpertAssignedPassages = async (req, res) => {
+    if (!req.session.expertId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { subjectId, qset } = req.params;
+    const expertId = req.session.expertId;
+
+    try {
+        const query = `
+            SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
+            FROM expertreviewlog 
+            WHERE subjectId = ? AND qset = ? AND expertId = ?
+            ORDER BY loggedin DESC
+            LIMIT 1
+        `;
+        const [results] = await connection.query(query, [subjectId, qset, expertId]);
+
+        if (results.length > 0) {
+            console.log("Assigned student_id:", results[0].student_id);
+            res.status(200).json(results[0]);
+        } else {
+            res.status(404).json({ error: 'No assigned passages found' });
+        }
+    } catch (err) {
+        console.error("Error fetching assigned passages:", err);
+        res.status(500).json({ error: 'Error fetching assigned passages' });
+    }
+};
+
 exports.assignStudentForQSet = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -95,7 +195,7 @@ exports.assignStudentForQSet = async (req, res) => {
             SELECT student_id, loggedin, status, subm_done, subm_time, QPA, QPB
             FROM expertreviewlog 
             WHERE subjectId = ? AND qset = ? AND expertId = ? 
-            ORDER BY loggedin DESC
+            ORDER BY student_id ASC
             LIMIT 1
         `;
         const [assignmentResult] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
@@ -112,12 +212,13 @@ exports.assignStudentForQSet = async (req, res) => {
             QPA = assignmentResult[0].QPA;
             QPB = assignmentResult[0].QPB;
 
-            if (subm_done === 1 && subm_time !== null) {
+            if (subm_done === 1) {
                 // The current assignment is complete, try to assign a new student
                 const assignNewStudentQuery = `
                     UPDATE expertreviewlog 
                     SET expertId = ?, loggedin = NOW(), status = 1, subm_done = 0, subm_time = NULL
                     WHERE subjectId = ? AND qset = ? AND expertId IS NULL AND student_id IS NOT NULL
+                    ORDER BY student_id ASC
                     LIMIT 1
                 `;
                 const [assignResult] = await conn.query(assignNewStudentQuery, [expertId, subjectId, qset]);
@@ -139,11 +240,13 @@ exports.assignStudentForQSet = async (req, res) => {
                 }
             } else {
                 // The current assignment is not complete, update login status if not already logged in
-                if (!status) {
+                if (!status || !subm_done) {
                     const updateLoginQuery = `
                         UPDATE expertreviewlog 
                         SET loggedin = NOW(), status = 1
                         WHERE student_id = ? AND subjectId = ? AND qset = ? AND expertId = ?
+                        ORDER BY student_id ASC
+                        LIMIT 1
                     `;
                     await conn.query(updateLoginQuery, [student_id, subjectId, qset, expertId]);
                     loggedin = new Date();
@@ -215,68 +318,6 @@ exports.assignStudentForQSet = async (req, res) => {
     }
 };
 
-exports.getQSetsForSubject = async (req, res) => {
-    if (!req.session.expertId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { subjectId } = req.params;
-
-    try {
-        const qsetQuery = `
-            SELECT qset, COUNT(DISTINCT student_id) as student_count
-            FROM expertreviewlog 
-            WHERE subjectId = ?
-            GROUP BY qset
-            HAVING student_count > 0
-            ORDER BY qset
-        `;
-        const [qsetResults] = await connection.query(qsetQuery, [subjectId]);
-
-        console.log(`QSets for subject ${subjectId} with student counts:`);
-        qsetResults.forEach(qset => {
-            console.log(`QSet: ${qset.qset}, Student Count: ${qset.student_count}`);
-        });
-
-        // const availableQSets = qsetResults.map(qsetObj => qsetObj.qset);
-
-        res.status(200).json(qsetResults);
-    } catch (err) {
-        console.error("Error fetching qsets:", err);
-        res.status(500).json({ error: 'Error fetching qsets' });
-    }
-};
-
-exports.getExpertAssignedPassages = async (req, res) => {
-    if (!req.session.expertId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { subjectId, qset } = req.params;
-    const expertId = req.session.expertId;
-
-    try {
-        const query = `
-            SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
-            FROM expertreviewlog 
-            WHERE subjectId = ? AND qset = ? AND expertId = ?
-            ORDER BY loggedin DESC
-            LIMIT 1
-        `;
-        const [results] = await connection.query(query, [subjectId, qset, expertId]);
-
-        if (results.length > 0) {
-            console.log("Assigned student_id:", results[0].student_id);
-            res.status(200).json(results[0]);
-        } else {
-            res.status(404).json({ error: 'No assigned passages found' });
-        }
-    } catch (err) {
-        console.error("Error fetching assigned passages:", err);
-        res.status(500).json({ error: 'Error fetching assigned passages' });
-    }
-};
-
 exports.getStudentPassages = async (req, res) => {
     console.log("getStudentPassages called with params:", req.params);
     if (!req.session.expertId) {
@@ -333,7 +374,7 @@ exports.getPassagesByStudentId = async (req, res) => {
     }
 };
 
-// Ignore list functions
+// Ignore list management routes
 // 1. Get ignorelist functions
 exports.getIgnoreList = async (req, res) => {
     if (!req.session.expertId) {
@@ -843,42 +884,9 @@ exports.removeFromStudentIgnoreList = async (req, res) => {
 };
 
 // Functions to check the expert logged in status
-exports.logoutExpert = async (req, res) => {
-    if (!req.session.expertId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
 
-    const expertId = req.session.expertId;
 
-    let conn;
-    try {
-        conn = await connection.getConnection();
-
-        const updateStatusQuery = `
-            UPDATE expertreviewlog 
-            SET status = 0
-            WHERE expertId = ?
-        `;
-        await conn.query(updateStatusQuery, [expertId]);
-
-        // Clear the session
-        req.session.destroy((err) => {
-            if (err) {
-                console.error("Error destroying session:", err);
-                return res.status(500).json({ error: 'Error logging out' });
-            }
-            res.status(200).json({ message: 'Logged out successfully' });
-        });
-
-    } catch (err) {
-        console.error("Error logging out expert:", err);
-        res.status(500).json({ error: 'Error logging out' });
-    } finally {
-        if (conn) conn.release();
-    }
-};
-
-// Function to handle the expert submission
+// Passage review submission function
 exports.submitPassageReview = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
