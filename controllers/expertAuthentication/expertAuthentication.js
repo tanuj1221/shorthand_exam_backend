@@ -312,6 +312,7 @@ exports.assignStudentForQSet = async (req, res) => {
         if (conn) conn.release();
     }
 };
+
 exports.getStudentPassages = async (req, res) => {
     console.log("getStudentPassages called with params:", req.params);
     if (!req.session.expertId) {
@@ -894,25 +895,47 @@ exports.submitPassageReview = async (req, res) => {
         conn = await connection.getConnection();
         await conn.beginTransaction();
 
-        // Update the expertreviewlog table
+        // First, fetch the current assignment for this expert
+        const fetchAssignmentQuery = `
+            SELECT student_id
+            FROM expertreviewlog
+            WHERE subjectId = ? AND qset = ? AND expertId = ? AND status = 1 AND subm_done = 0
+            ORDER BY loggedin DESC
+            LIMIT 1
+        `;
+        const [assignmentResult] = await conn.query(fetchAssignmentQuery, [subjectId, qset, expertId]);
+
+        if (assignmentResult.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'No active assignment found for this expert' });
+        }
+
+        const studentId = assignmentResult[0].student_id;
+
+        // Update the expertreviewlog table for the specific student
         const updateQuery = `
             UPDATE expertreviewlog 
             SET subm_done = 1, subm_time = NOW()
-            WHERE subjectId = ? AND qset = ? AND expertId = ? AND student_id IS NOT NULL
+            WHERE subjectId = ? AND qset = ? AND expertId = ? AND student_id = ? AND status = 1
         `;
-        await conn.query(updateQuery, [subjectId, qset, expertId]);
+        const [updateResult] = await conn.query(updateQuery, [subjectId, qset, expertId, studentId]);
+
+        if (updateResult.affectedRows === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'No matching record found to update' });
+        }
 
         // Fetch the updated record
         const selectQuery = `
             SELECT student_id, subm_done, subm_time
             FROM expertreviewlog
-            WHERE subjectId = ? AND qset = ? AND expertId = ?
+            WHERE subjectId = ? AND qset = ? AND expertId = ? AND student_id = ?
         `;
-        const [results] = await conn.query(selectQuery, [subjectId, qset, expertId]);
+        const [results] = await conn.query(selectQuery, [subjectId, qset, expertId, studentId]);
 
         if (results.length === 0) {
             await conn.rollback();
-            return res.status(404).json({ error: 'No matching record found' });
+            return res.status(404).json({ error: 'Updated record not found' });
         }
 
         await conn.commit();
