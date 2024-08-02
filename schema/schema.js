@@ -140,6 +140,25 @@ const schema = {
         QPA: 'TEXT',
         QPB: 'TEXT'
     },
+    modreviewlog: {
+        id: 'BIGINT PRIMARY KEY AUTO_INCREMENT',
+        student_id: 'BIGINT',
+        passageA: 'TEXT',
+        passageB: 'TEXT',
+        passageA_word_count: 'INT',
+        passageB_word_count: 'INT',
+        ansPassageA: 'TEXT',
+        ansPassageB: 'TEXT',
+        subjectId: 'INT REFERENCES subjectsdb(subjectId)',
+        qset: 'INT',
+        expertId: 'INT REFERENCES expertdb(expertId)',
+        loggedin: 'DATETIME',
+        status: 'BOOLEAN',
+        subm_done: 'BOOLEAN',
+        subm_time: 'DATETIME',
+        QPA: 'TEXT',
+        QPB: 'TEXT'
+    },
     subjectsdb: {
         subjectId: 'INT PRIMARY KEY',
         courseId: 'INT',
