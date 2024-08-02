@@ -190,88 +190,50 @@ exports.assignStudentForQSet = async (req, res) => {
         conn = await connection.getConnection();
         await conn.beginTransaction();
 
-        const checkAssignmentQuery = `
+        // Check if the expert already has an active assignment
+        const checkExistingAssignmentQuery = `
             SELECT student_id, loggedin, status, subm_done, subm_time, QPA, QPB
             FROM modreviewlog 
-            WHERE subjectId = ? AND qset = ? AND expertId = ? 
-            ORDER BY loggedin DESC
+            WHERE subjectId = ? AND qset = ? AND expertId = ? AND (subm_done IS NULL OR subm_done = 0)
             LIMIT 1
         `;
-        const [assignmentResult] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
+        const [existingAssignment] = await conn.query(checkExistingAssignmentQuery, [subjectId, qset, expertId]);
 
         let student_id, loggedin, status, subm_done, subm_time, QPA, QPB;
 
-        if (assignmentResult.length > 0) {
-            student_id = assignmentResult[0].student_id;
-            loggedin = assignmentResult[0].loggedin;
-            status = assignmentResult[0].status;
-            subm_done = assignmentResult[0].subm_done;
-            subm_time = assignmentResult[0].subm_time;
-            QPA = assignmentResult[0].QPA;
-            QPB = assignmentResult[0].QPB;
+        if (existingAssignment.length > 0) {
+            // Expert has an existing active assignment
+            ({ student_id, loggedin, status, subm_done, subm_time, QPA, QPB } = existingAssignment[0]);
 
-            if (subm_done === null || subm_done === 0) {
-                // The current assignment is not complete, update it
-                const updateAssignmentQuery = `
-                    UPDATE modreviewlog 
-                    SET loggedin = NOW(), status = 1, subm_done = 0, subm_time = NULL
-                    WHERE student_id = ? AND subjectId = ? AND qset = ? AND expertId = ?
-                `;
-                await conn.query(updateAssignmentQuery, [student_id, subjectId, qset, expertId]);
-                loggedin = new Date();
-                status = 1;
-                subm_done = 0;
-                subm_time = null;
-            } else if (subm_done === 1 && subm_time !== null) {
-                // The current assignment is complete, try to assign a new student
-                const assignNewStudentQuery = `
-                    UPDATE modreviewlog 
-                    SET expertId = ?, loggedin = NOW(), status = 1, subm_done = 0, subm_time = NULL
-                    WHERE subjectId = ? AND qset = ? AND (expertId IS NULL OR subm_done IS NULL OR subm_done = 0) AND student_id IS NOT NULL
-                    LIMIT 1
-                `;
-                const [assignResult] = await conn.query(assignNewStudentQuery, [expertId, subjectId, qset]);
-
-                if (assignResult.affectedRows > 0) {
-                    // Fetch the new assignment details
-                    const [newAssignment] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
-                    student_id = newAssignment[0].student_id;
-                    loggedin = newAssignment[0].loggedin;
-                    status = newAssignment[0].status;
-                    subm_done = newAssignment[0].subm_done;
-                    subm_time = newAssignment[0].subm_time;
-                    QPA = newAssignment[0].QPA;
-                    QPB = newAssignment[0].QPB;
-                } else {
-                    // No available students
-                    await conn.rollback();
-                    return res.status(400).json({ error: 'No available students for this QSet. All students are already assigned and completed.' });
-                }
-            }
+            // Update the existing assignment
+            const updateAssignmentQuery = `
+                UPDATE modreviewlog 
+                SET loggedin = NOW(), status = 1, subm_done = 0, subm_time = NULL
+                WHERE student_id = ? AND subjectId = ? AND qset = ? AND expertId = ?
+            `;
+            await conn.query(updateAssignmentQuery, [student_id, subjectId, qset, expertId]);
+            loggedin = new Date();
+            status = 1;
+            subm_done = 0;
+            subm_time = null;
         } else {
-            // Expert has no existing assignment, try to assign a new student
+            // Assign a new student that is not already assigned to any expert
             const assignNewStudentQuery = `
                 UPDATE modreviewlog 
                 SET expertId = ?, loggedin = NOW(), status = 1, subm_done = 0, subm_time = NULL
-                WHERE subjectId = ? AND qset = ? AND (expertId IS NULL OR subm_done IS NULL OR subm_done = 0) AND student_id IS NOT NULL
+                WHERE subjectId = ? AND qset = ? AND expertId IS NULL AND student_id IS NOT NULL
                 LIMIT 1
             `;
             const [assignResult] = await conn.query(assignNewStudentQuery, [expertId, subjectId, qset]);
 
             if (assignResult.affectedRows > 0) {
                 // Fetch the new assignment details
-                const [newAssignment] = await conn.query(checkAssignmentQuery, [subjectId, qset, expertId]);
-                student_id = newAssignment[0].student_id;
-                loggedin = newAssignment[0].loggedin;
-                status = newAssignment[0].status;
-                subm_done = newAssignment[0].subm_done;
-                subm_time = newAssignment[0].subm_time;
-                QPA = newAssignment[0].QPA;
-                QPB = newAssignment[0].QPB;
+                const [newAssignment] = await conn.query(checkExistingAssignmentQuery, [subjectId, qset, expertId]);
+                ({ student_id, loggedin, status, subm_done, subm_time, QPA, QPB } = newAssignment[0]);
             } else {
                 // No available students
                 await conn.rollback();
-                return res.status(400).json({ error: 'No available students for this QSet. All students are already assigned and completed.' });
+                return res.status(400).json({ error: 'No available students for this QSet. All students are already assigned.' });
             }
         }
 
