@@ -424,80 +424,34 @@ exports.getStudentIgnoreList = async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { subjectId, qset, activePassage, studentId } = req.body;
-    const expertId = req.session.expertId;
+    const { subjectId, qset, activePassage } = req.body;
+    // const expertId = req.session.expertId;
 
     // Input validation
     if (!subjectId || !qset || !activePassage) {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    console.log('this fetched')
+
     try {
-        const columnName = activePassage === 'A' ? 'QPA' : 'QPB';
+        const columnName = `Q${qset}P${activePassage}`;
         
         const query = `
-            SELECT ${columnName} AS ignoreList, student_id
-            FROM modreviewlog
-            WHERE subjectId = ? AND qset = ? AND student_id = ?
-            ORDER BY loggedin DESC
-            LIMIT 1
+            SELECT ${columnName} AS ignoreList
+            FROM qsetdb
+            WHERE subject_id = ?
         `;
         
-        const [results] = await connection.query(query, [subjectId, qset, studentId]);
+        const [results] = await connection.query(query, [subjectId]);
 
-        if (results.length > 0) {
-            const { ignoreList, student_id } = results[0];
-            
-            if (ignoreList) {
-                // Split the ignore list string into an array
-                const ignoreListArray = ignoreList.split(',').map(item => item.trim());
-                
-                console.log(`Fetched ignore list for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
-                console.log(`Table: modreviewlog, Column: ${columnName}`);
-                console.log(`Ignore list: ${ignoreListArray.join(', ')}`);
-                
-                res.status(200).json({ 
-                    ignoreList: ignoreListArray,
-                    debug: {
-                        expertId,
-                        student_id,
-                        subjectId,
-                        qset,
-                        activePassage,
-                        table: 'modreviewlog',
-                        column: columnName
-                    }
-                });
-            } else {
-                console.log(`No ignore list found for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
-                console.log(`Table: modreviewlog, Column: ${columnName}`);
-                res.status(404).json({ 
-                    error: 'No ignore list found',
-                    debug: {
-                        expertId,
-                        student_id,
-                        subjectId,
-                        qset,
-                        activePassage,
-                        table: 'modreviewlog',
-                        column: columnName
-                    }
-                });
-            }
+        if (results.length > 0 && results[0].ignoreList) {
+            // Split the ignore list string into an array
+            const ignoreList = results[0].ignoreList.split(',').map(item => item.trim());
+            console.log(ignoreList)
+            res.status(200).json({ ignoreList });
         } else {
-            console.log(`No record found for expertId: ${expertId}, subjectId: ${subjectId}, qset: ${qset}`);
-            console.log(`Table: modreviewlog, Column: ${columnName}`);
-            res.status(404).json({ 
-                error: 'No record found',
-                debug: {
-                    expertId,
-                    subjectId,
-                    qset,
-                    activePassage,
-                    table: 'modreviewlog',
-                    column: columnName
-                }
-            });
+            res.status(404).json({ error: 'No ignore list found' });
         }
     } catch (err) {
         console.error("Error fetching ignore list:", err);
@@ -606,68 +560,52 @@ exports.addToStudentIgnoreList = async (req, res) => {
         conn = await connection.getConnection();
         await conn.beginTransaction();
 
-        const columnName = activePassage === 'A' ? 'QPA' : 'QPB';
+        const columnName = `Q${qset}P${activePassage}`;
         
-        // Fetch the current ignore list using studentId
+        // First, fetch the current ignore list
         const selectQuery = `
             SELECT ${columnName} AS ignoreList
-            FROM modreviewlog
-            WHERE subjectId = ? AND qset = ? AND student_id = ?
-            ORDER BY loggedin DESC
-            LIMIT 1
+            FROM qsetdb 
+            WHERE subject_id = ?
             FOR UPDATE
         `;
         
-        const [results] = await conn.query(selectQuery, [subjectId, qset, studentId]);
+        const [results] = await conn.query(selectQuery, [subjectId]);
 
-        let currentIgnoreList = [];
-        if (results.length > 0 && results[0].ignoreList) {
-            currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
+        if (results.length === 0 || !results[0].ignoreList) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'No ignore list found' });
         }
 
-        // Add the new word if it's not already in the list
-        if (!currentIgnoreList.includes(newWord)) {
-            currentIgnoreList.unshift(newWord);
-            console.log(`Word added: ${newWord}`);
-            console.log(`Table updated: modreviewlog`);
-            console.log(`Column updated: ${columnName}`);
-        } else {
-            console.log(`Word "${newWord}" already exists in the ignore list. No changes made.`);
-        }
+        let currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
+
+        // Remove the word from the list
+        currentIgnoreList = currentIgnoreList.filter(word => word.toLowerCase() !== wordToRemove.toLowerCase());
 
         // Join the list back into a comma-separated string
         const updatedIgnoreList = currentIgnoreList.join(', ');
 
         // Update the database with the new ignore list
         const updateQuery = `
-            UPDATE modreviewlog
+            UPDATE qsetdb
             SET ${columnName} = ?
-            WHERE subjectId = ? AND qset = ? AND student_id = ?
+            WHERE subject_id = ?
         `;
 
-        await conn.query(updateQuery, [updatedIgnoreList, subjectId, qset, studentId]);
+        await conn.query(updateQuery, [updatedIgnoreList, subjectId]);
         
         await conn.commit();
 
-        res.status(200).json({ 
-            message: 'Word added to ignore list', 
-            ignoreList: currentIgnoreList,
-            debug: {
-                studentId,
-                subjectId,
-                qset,
-                activePassage,
-                table: 'modreviewlog',
-                column: columnName
-            }
-        });
+        res.status(200).json({ message: 'Word removed from ignore list', ignoreList: currentIgnoreList });
     } catch (err) {
         if (conn) await conn.rollback();
-        console.error("Error adding word to ignore list:", err);
-        res.status(500).json({ error: 'Error adding word to ignore list' });
+        console.error("Error removing word from ignore list:", err);
+        res.status(500).json({ error: 'Error removing word from ignore list' });
     } finally {
         if (conn) conn.release();
     }
+
+
 };
 
 // 2. Get addToIgnoreList functions
@@ -772,19 +710,17 @@ exports.removeFromStudentIgnoreList = async (req, res) => {
         conn = await connection.getConnection();
         await conn.beginTransaction();
 
-        const columnName = activePassage === 'A' ? 'QPA' : 'QPB';
+        const columnName = `Q${qset}P${activePassage}`;
         
-        // Fetch the current ignore list using studentId
+        // First, fetch the current ignore list
         const selectQuery = `
             SELECT ${columnName} AS ignoreList
-            FROM modreviewlog
-            WHERE subjectId = ? AND qset = ? AND student_id = ?
-            ORDER BY loggedin DESC
-            LIMIT 1
+            FROM qsetdb 
+            WHERE subject_id = ?
             FOR UPDATE
         `;
         
-        const [results] = await conn.query(selectQuery, [subjectId, qset, studentId]);
+        const [results] = await conn.query(selectQuery, [subjectId]);
 
         if (results.length === 0 || !results[0].ignoreList) {
             await conn.rollback();
@@ -794,43 +730,23 @@ exports.removeFromStudentIgnoreList = async (req, res) => {
         let currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
 
         // Remove the word from the list
-        const initialLength = currentIgnoreList.length;
         currentIgnoreList = currentIgnoreList.filter(word => word.toLowerCase() !== wordToRemove.toLowerCase());
-
-        if (currentIgnoreList.length < initialLength) {
-            console.log(`Word removed: ${wordToRemove}`);
-            console.log(`Table updated: modreviewlog`);
-            console.log(`Column updated: ${columnName}`);
-        } else {
-            console.log(`Word "${wordToRemove}" not found in the ignore list. No changes made.`);
-        }
 
         // Join the list back into a comma-separated string
         const updatedIgnoreList = currentIgnoreList.join(', ');
 
         // Update the database with the new ignore list
         const updateQuery = `
-            UPDATE modreviewlog
+            UPDATE qsetdb
             SET ${columnName} = ?
-            WHERE subjectId = ? AND qset = ? AND student_id = ?
+            WHERE subject_id = ?
         `;
 
-        await conn.query(updateQuery, [updatedIgnoreList, subjectId, qset, studentId]);
+        await conn.query(updateQuery, [updatedIgnoreList, subjectId]);
         
         await conn.commit();
 
-        res.status(200).json({ 
-            message: 'Word removed from ignore list', 
-            ignoreList: currentIgnoreList,
-            debug: {
-                studentId,
-                subjectId,
-                qset,
-                activePassage,
-                table: 'modreviewlog',
-                column: columnName
-            }
-        });
+        res.status(200).json({ message: 'Word removed from ignore list', ignoreList: currentIgnoreList });
     } catch (err) {
         if (conn) await conn.rollback();
         console.error("Error removing word from ignore list:", err);
