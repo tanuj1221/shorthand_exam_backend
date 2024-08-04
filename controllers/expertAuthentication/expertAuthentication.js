@@ -548,10 +548,12 @@ exports.addToIgnoreList = async (req, res) => {
 };
 
 exports.addToStudentIgnoreList = async (req, res) => {
-    const { subjectId, qset, activePassage, newWord, studentId } = req.body;
+    console.log("Received data:", req.body);
+    const { activePassage, newWord, subjectId, qset } = req.body;
 
     // Input validation
-    if (!subjectId || !qset || !activePassage || !newWord || !studentId) {
+    if (!subjectId || !qset || !activePassage || !newWord) {
+        console.log("Missing parameters:", { subjectId, qset, activePassage, newWord });
         return res.status(400).json({ error: 'Missing required parameters' });
     }
 
@@ -565,22 +567,22 @@ exports.addToStudentIgnoreList = async (req, res) => {
         // First, fetch the current ignore list
         const selectQuery = `
             SELECT ${columnName} AS ignoreList
-            FROM qsetdb 
+            FROM qsetdb
             WHERE subject_id = ?
             FOR UPDATE
         `;
         
         const [results] = await conn.query(selectQuery, [subjectId]);
 
-        if (results.length === 0 || !results[0].ignoreList) {
-            await conn.rollback();
-            return res.status(404).json({ error: 'No ignore list found' });
+        let currentIgnoreList = [];
+        if (results.length > 0 && results[0].ignoreList) {
+          currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
         }
 
-        let currentIgnoreList = results[0].ignoreList.split(',').map(item => item.trim());
-
-        // Remove the word from the list
-        currentIgnoreList = currentIgnoreList.filter(word => word.toLowerCase() !== wordToRemove.toLowerCase());
+        // Add the new word if it's not already in the list
+        if (!currentIgnoreList.includes(newWord)) {
+            currentIgnoreList.unshift(newWord);
+          }
 
         // Join the list back into a comma-separated string
         const updatedIgnoreList = currentIgnoreList.join(', ');
@@ -595,17 +597,16 @@ exports.addToStudentIgnoreList = async (req, res) => {
         await conn.query(updateQuery, [updatedIgnoreList, subjectId]);
         
         await conn.commit();
+        console.log(currentIgnoreList);
 
-        res.status(200).json({ message: 'Word removed from ignore list', ignoreList: currentIgnoreList });
+        res.status(200).json({ message: 'Word added to ignore list', ignoreList: currentIgnoreList });
     } catch (err) {
         if (conn) await conn.rollback();
-        console.error("Error removing word from ignore list:", err);
-        res.status(500).json({ error: 'Error removing word from ignore list' });
+        console.error("Error adding word to ignore list:", err);
+        res.status(500).json({ error: 'Error adding word to ignore list' });
     } finally {
         if (conn) conn.release();
     }
-
-
 };
 
 // 2. Get addToIgnoreList functions
@@ -698,10 +699,10 @@ exports.removeFromIgnoreList = async (req, res) => {
 };
 
 exports.removeFromStudentIgnoreList = async (req, res) => {
-    const { subjectId, qset, activePassage, wordToRemove, studentId } = req.body;
+    const { subjectId, qset, activePassage, wordToRemove } = req.body;
 
     // Input validation
-    if (!subjectId || !qset || !activePassage || !wordToRemove || !studentId) {
+    if (!subjectId || !qset || !activePassage || !wordToRemove) {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
 
