@@ -286,7 +286,7 @@ exports.getStudentPassages = async (req, res) => {
     try {
         const query = `
             SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
-            FROM modreviewlog 
+            FROM expertreviewlog 
             WHERE subjectId = ? AND qset = ? AND student_id = ?
             LIMIT 1
         `;
@@ -314,7 +314,7 @@ exports.getPassagesByStudentId = async (req, res) => {
     try {
         const query = `
             SELECT passageA, passageB, ansPassageA, ansPassageB, student_id, subjectId, qset
-            FROM modreviewlog 
+            FROM expertreviewlog 
             WHERE student_id = ?
         `;
         const [results] = await connection.query(query, [studentId]);
