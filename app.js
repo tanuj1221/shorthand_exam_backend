@@ -34,13 +34,13 @@ app.use(express.static(path.join(__dirname, 'build')));
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' http://localhost:5000;"
+    "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' http://43.204.22.53:5000;"
   );
   next();
 });
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:5000'],
+  origin: ['http://52.66.236.172:3000', 'http://52.66.236.172:3001', 'http://52.66.236.172:3002', 'http://43.204.22.53:5000'],
   credentials: true
 }));
 
@@ -94,6 +94,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://52.66.236.172:${PORT}`);
 });
   
