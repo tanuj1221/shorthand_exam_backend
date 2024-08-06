@@ -83,28 +83,38 @@ exports.getExpertDetails = async (req, res) => {
     });
 };
 
-// Subject and QSet management functions
 exports.getAllSubjects = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const subjectsQuery = `
-        SELECT e.subjectId, s.subject_name, COUNT(DISTINCT e.student_id) as student_count
-        FROM modreviewlog e
-        JOIN subjectsdb s ON e.subjectId = s.subjectId
-        WHERE e.student_id IS NOT NULL
-        GROUP BY e.subjectId, s.subject_name
-        ORDER BY e.subjectId
+    SELECT 
+        s.subjectId, 
+        s.subject_name, 
+        s.subject_name_short, 
+        s.daily_timer, 
+        s.passage_timer, 
+        s.demo_timer,
+        COUNT(DISTINCT CASE WHEN m.subm_done IS NULL OR m.subm_done = 0 THEN m.student_id END) AS incomplete_count,
+        COUNT(DISTINCT m.student_id) AS total_count
+    FROM 
+        subjectsdb s
+    LEFT JOIN 
+        modreviewlog m ON s.subjectId = m.subjectId AND m.expertId = ?
+    GROUP BY 
+        s.subjectId, s.subject_name, s.subject_name_short, s.daily_timer, s.passage_timer, s.demo_timer
+    HAVING 
+        incomplete_count > 0;
     `;
 
     try {
-        const [results] = await connection.query(subjectsQuery);
+        const [results] = await connection.query(subjectsQuery, [req.session.expertId]);
         
         // Console log the subjects and their student counts
         console.log("Subjects available for expert with student counts:");
         results.forEach(subject => {
-            console.log(`Subject ID: ${subject.subjectId}, Name: ${subject.subject_name}, Student Count: ${subject.student_count}`);
+            console.log(`Subject ID: ${subject.subjectId}, Name: ${subject.subject_name}, Incomplete Count: ${subject.incomplete_count}, Total Count: ${subject.total_count}`);
         });
 
         res.status(200).json(results);
@@ -120,24 +130,27 @@ exports.getQSetsForSubject = async (req, res) => {
     }
 
     const { subjectId } = req.params;
+    const expertId = req.session.expertId;
 
     try {
         const qsetQuery = `
-            SELECT qset, COUNT(DISTINCT student_id) as student_count
+            SELECT 
+                qset, 
+                COUNT(DISTINCT CASE WHEN subm_done IS NULL OR subm_done = 0 THEN student_id END) as incomplete_count,
+                COUNT(DISTINCT student_id) as total_count
             FROM modreviewlog 
             WHERE subjectId = ?
+            AND expertId = ?
             GROUP BY qset
-            HAVING student_count > 0
+            HAVING incomplete_count > 0
             ORDER BY qset
         `;
-        const [qsetResults] = await connection.query(qsetQuery, [subjectId]);
+        const [qsetResults] = await connection.query(qsetQuery, [subjectId, expertId]);
 
-        console.log(`QSets for subject ${subjectId} with student counts:`);
+        console.log(`QSets for subject ${subjectId} and expert ${expertId} with student counts:`);
         qsetResults.forEach(qset => {
-            console.log(`QSet: ${qset.qset}, Student Count: ${qset.student_count}`);
+            console.log(`QSet: ${qset.qset}, Incomplete Count: ${qset.incomplete_count}, Total Count: ${qset.total_count}`);
         });
-
-        // const availableQSets = qsetResults.map(qsetObj => qsetObj.qset);
 
         res.status(200).json(qsetResults);
     } catch (err) {
