@@ -89,23 +89,23 @@ exports.getAllSubjects = async (req, res) => {
     }
 
     const subjectsQuery = `
-    SELECT 
-        s.subjectId, 
-        s.subject_name, 
-        s.subject_name_short, 
-        s.daily_timer, 
-        s.passage_timer, 
-        s.demo_timer,
-        COUNT(DISTINCT CASE WHEN m.subm_done IS NULL OR m.subm_done = 0 THEN m.student_id END) AS incomplete_count,
-        COUNT(DISTINCT m.student_id) AS total_count
-    FROM 
-        subjectsdb s
-    LEFT JOIN 
-        modreviewlog m ON s.subjectId = m.subjectId AND m.expertId = ?
-    GROUP BY 
-        s.subjectId, s.subject_name, s.subject_name_short, s.daily_timer, s.passage_timer, s.demo_timer
-    HAVING 
-        incomplete_count > 0;
+        SELECT 
+            s.subjectId, 
+            s.subject_name, 
+            s.subject_name_short, 
+            s.daily_timer, 
+            s.passage_timer, 
+            s.demo_timer,
+            COUNT(DISTINCT CASE WHEN m.subm_done IS NULL OR m.subm_done = 0 THEN m.student_id END) AS incomplete_count,
+            COUNT(DISTINCT m.student_id) AS total_count
+        FROM 
+            subjectsdb s
+        LEFT JOIN 
+            modreviewlog m ON s.subjectId = m.subjectId AND m.expertId = ?
+        GROUP BY 
+            s.subjectId, s.subject_name, s.subject_name_short, s.daily_timer, s.passage_timer, s.demo_timer
+        HAVING 
+            incomplete_count > 0;
     `;
 
     try {
