@@ -293,54 +293,146 @@ exports.getStudentPassages = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
-
+    const expertId = req.session.expertId;
     const { subjectId, qset, studentId } = req.params;
 
-    try {
-        const query = `
-            SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
-            FROM expertreviewlog 
-            WHERE subjectId = ? AND qset = ? AND student_id = ?
-            LIMIT 1
-        `;
-        const [results] = await connection.query(query, [subjectId, qset, studentId]);
-
-        if (results.length > 0) {
-            console.log("Fetched student_id:", results[0].student_id);
-            res.status(200).json(results[0]);
-        } else {
-            res.status(404).json({ error: 'No passages found for this student' });
+    if(expertId === 8){
+        try {
+            const query = `
+                SELECT passageA, passageB, ansPassageA, ansPassageB, student_id
+                FROM expertreviewlog 
+                WHERE subjectId = ? AND qset = ? AND student_id = ?
+                LIMIT 1
+            `;
+            const [results] = await connection.query(query, [subjectId, qset, studentId]);
+    
+            if (results.length > 0) {
+                console.log("Fetched student_id:", results[0].student_id);
+                res.status(200).json(results[0]);
+            } else {
+                res.status(404).json({ error: 'No passages found for this student' });
+            }
+        } catch (err) {
+            console.error("Error fetching student passages:", err);
+            res.status(500).json({ error: 'Error fetching student passages' });
         }
-    } catch (err) {
-        console.error("Error fetching student passages:", err);
-        res.status(500).json({ error: 'Error fetching student passages' });
     }
+    else if(expertId === 100){
+        try {
+            const query = `
+                SELECT passageA, passageB, ansPassageA, ansPassageB, student_id, QPA, QPB
+                FROM modreviewlog 
+                WHERE subjectId = ? AND qset = ? AND student_id = ?
+                LIMIT 1
+            `;
+            const [results] = await connection.query(query, [subjectId, qset, studentId]);
+    
+            if (results.length > 0) {
+                console.log("Fetched student_id:", results[0].student_id);
+                res.status(200).json(results[0]);
+            } else {
+                res.status(404).json({ error: 'No passages found for this student' });
+            }
+        } catch (err) {
+            console.error("Error fetching student passages:", err);
+            res.status(500).json({ error: 'Error fetching student passages' });
+        }
+    }
+
 };
 
 exports.getPassagesByStudentId = async (req, res) => {
+    console.log("getPassagesByStudentId called");
+    console.log("req.body:", req.body);
+
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const { studentId } = req.body;  // Changed from req.params to req.body
+    const expertId = req.session.expertId;
 
-    try {
-        const query = `
-            SELECT passageA, passageB, ansPassageA, ansPassageB, student_id, subjectId, qset
-            FROM expertreviewlog 
-            WHERE student_id = ?
-        `;
-        const [results] = await connection.query(query, [studentId]);
-
-        if (results.length > 0) {
-            console.log("Assigned student_id:", results[0].student_id);
-            res.status(200).json(results[0]);
-        } else {
-            res.status(404).json({ error: 'No assigned passages found' });
+    if(expertId === 8){
+        try {
+            const query = `
+                SELECT passageA, passageB, ansPassageA, ansPassageB, student_id, subjectId, qset
+                FROM expertreviewlog 
+                WHERE student_id = ?
+            `;
+            const [results] = await connection.query(query, [studentId]);
+    
+            if (results.length > 0) {
+                console.log("Assigned student_id:", results[0].student_id);
+                res.status(200).json(results[0]);
+            } else {
+                res.status(404).json({ error: 'No assigned passages found' });
+            }
+        } catch (err) {
+            console.error("Error fetching assigned passages:", err);
+            res.status(500).json({ error: 'Error fetching assigned passages' });
         }
-    } catch (err) {
-        console.error("Error fetching assigned passages:", err);
-        res.status(500).json({ error: 'Error fetching assigned passages' });
+    }
+    else if(expertId === 100){
+        let conn;
+        try {
+            conn = await connection.getConnection();
+            await conn.beginTransaction();
+
+            const query = `
+                SELECT passageA, passageB, ansPassageA, ansPassageB, student_id, subjectId, qset, QPA, QPB
+                FROM modreviewlog 
+                WHERE student_id = ?
+            `;
+            const [results] = await conn.query(query, [studentId]);
+
+            if (results.length > 0) {
+                const { subjectId, qset, QPA, QPB } = results[0];
+
+                // Check if QPA and QPB are already filled
+                if (!QPA || !QPB) {
+                    // Fetch ignore lists
+                    const fetchIgnoreListsQuery = `
+                        SELECT Q${qset}PA as QPA, Q${qset}PB as QPB
+                        FROM qsetdb
+                        WHERE subject_id = ?
+                    `;
+                    const [ignoreListsResult] = await conn.query(fetchIgnoreListsQuery, [subjectId]);
+
+                    if (ignoreListsResult.length === 0) {
+                        await conn.rollback();
+                        return res.status(404).json({ error: 'Ignore lists not found for this subject and qset' });
+                    }
+
+                    const newQPA = QPA || ignoreListsResult[0].QPA;
+                    const newQPB = QPB || ignoreListsResult[0].QPB;
+
+                    // Update the modreviewlog with the ignore lists
+                    const updateIgnoreListsQuery = `
+                        UPDATE modreviewlog
+                        SET QPA = COALESCE(QPA, ?), QPB = COALESCE(QPB, ?)
+                        WHERE student_id = ? AND subjectId = ? AND qset = ?
+                    `;
+                    await conn.query(updateIgnoreListsQuery, [newQPA, newQPB, studentId, subjectId, qset]);
+
+                    // Update the results with new QPA and QPB
+                    results[0].QPA = newQPA;
+                    results[0].QPB = newQPB;
+                }
+
+                await conn.commit();
+                console.log("Assigned student_id:", results[0].student_id);
+                res.status(200).json(results[0]);
+            } else {
+                await conn.rollback();
+                res.status(404).json({ error: 'No assigned passages found' });
+            }
+        } catch (err) {
+            if (conn) await conn.rollback();
+            console.error("Error fetching assigned passages:", err);
+            res.status(500).json({ error: 'Error fetching assigned passages' });
+        } finally {
+            if (conn) conn.release();
+        }
     }
 };
 
@@ -437,38 +529,113 @@ exports.getStudentIgnoreList = async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { subjectId, qset, activePassage } = req.body;
-    // const expertId = req.session.expertId;
+    const { subjectId, qset, activePassage, studentId } = req.body;
+    const expertId = req.session.expertId;
 
     // Input validation
-    if (!subjectId || !qset || !activePassage) {
+    if (!subjectId || !qset || !activePassage || !studentId) {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
 
     console.log('this fetched')
 
-    try {
-        const columnName = `Q${qset}P${activePassage}`;
-        
-        const query = `
-            SELECT ${columnName} AS ignoreList
-            FROM qsetdb
-            WHERE subject_id = ?
-        `;
-        
-        const [results] = await connection.query(query, [subjectId]);
+    if (expertId === 8){
+        try {
+            const columnName = `Q${qset}P${activePassage}`;
+            
+            const query = `
+                SELECT ${columnName} AS ignoreList
+                FROM qsetdb
+                WHERE subject_id = ?
+            `;
+            
+            const [results] = await connection.query(query, [subjectId]);
 
-        if (results.length > 0 && results[0].ignoreList) {
-            // Split the ignore list string into an array
-            const ignoreList = results[0].ignoreList.split(',').map(item => item.trim());
-            console.log(ignoreList)
-            res.status(200).json({ ignoreList });
-        } else {
-            res.status(404).json({ error: 'No ignore list found' });
+            if (results.length > 0 && results[0].ignoreList) {
+                // Split the ignore list string into an array
+                const ignoreList = results[0].ignoreList.split(',').map(item => item.trim());
+                console.log(ignoreList)
+                res.status(200).json({ ignoreList });
+            } else {
+                res.status(404).json({ error: 'No ignore list found' });
+            }
+        } catch (err) {
+            console.error("Error fetching ignore list:", err);
+            res.status(500).json({ error: 'Error fetching ignore list' });
         }
-    } catch (err) {
-        console.error("Error fetching ignore list:", err);
-        res.status(500).json({ error: 'Error fetching ignore list' });
+    }
+    else if(expertId === 100){
+        try {
+            const columnName = activePassage === 'A' ? 'QPA' : 'QPB';
+            
+            const query = `
+                SELECT ${columnName} AS ignoreList, student_id
+                FROM modreviewlog
+                WHERE subjectId = ? AND qset = ? AND student_id = ?
+                ORDER BY loggedin DESC
+                LIMIT 1
+            `;
+            
+            const [results] = await connection.query(query, [subjectId, qset, studentId]);
+    
+            if (results.length > 0) {
+                const { ignoreList, student_id } = results[0];
+                
+                if (ignoreList) {
+                    // Split the ignore list string into an array
+                    const ignoreListArray = ignoreList.split(',').map(item => item.trim());
+                    
+                    console.log(`Fetched ignore list for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
+                    console.log(`Table: modreviewlog, Column: ${columnName}`);
+                    console.log(`Ignore list: ${ignoreListArray.join(', ')}`);
+                    
+                    res.status(200).json({ 
+                        ignoreList: ignoreListArray,
+                        debug: {
+                            expertId,
+                            student_id,
+                            subjectId,
+                            qset,
+                            activePassage,
+                            table: 'modreviewlog',
+                            column: columnName
+                        }
+                    });
+                } else {
+                    console.log(`No ignore list found for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
+                    console.log(`Table: modreviewlog, Column: ${columnName}`);
+                    res.status(404).json({ 
+                        error: 'No ignore list found',
+                        debug: {
+                            expertId,
+                            student_id,
+                            subjectId,
+                            qset,
+                            activePassage,
+                            table: 'modreviewlog',
+                            column: columnName
+                        }
+                    });
+                }
+            } else {
+                console.log(`No record found for expertId: ${expertId}, subjectId: ${subjectId}, qset: ${qset}`);
+                console.log(`Table: modreviewlog, Column: ${columnName}`);
+                res.status(404).json({ 
+                    error: 'No record found',
+                    debug: {
+                        expertId,
+                        subjectId,
+                        qset,
+                        activePassage,
+                        table: 'modreviewlog',
+                        column: columnName
+                    }
+                });
+            }
+        } catch (err) {
+            console.error("Error fetching ignore list:", err);
+            res.status(500).json({ error: 'Error fetching ignore list' });
+        }
     }
 };
 
