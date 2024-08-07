@@ -622,7 +622,7 @@ exports.addToStudentIgnoreList = async (req, res) => {
     }
 };
 
-// 2. Get addToIgnoreList functions
+// 3. Get addToIgnoreList functions
 exports.removeFromIgnoreList = async (req, res) => {
     if (!req.session.expertId) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -769,6 +769,70 @@ exports.removeFromStudentIgnoreList = async (req, res) => {
         if (conn) conn.release();
     }
 };
+
+// 4. Clear ignore list
+exports.clearIgnoreList = async (req, res) => {
+    if (!req.session.expertId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { subjectId, qset, activePassage } = req.body;
+    const expertId = req.session.expertId;
+
+    // Input validation
+    if (!subjectId || !qset || !activePassage) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    try {
+        const columnName = activePassage === 'A' ? 'QPA' : 'QPB';
+        
+        const query = `
+            UPDATE modreviewlog
+            SET ${columnName} = NULL
+            WHERE subjectId = ? AND qset = ? AND expertId = ?
+            ORDER BY loggedin DESC
+            LIMIT 1
+        `;
+        
+        const [result] = await connection.query(query, [subjectId, qset, expertId]);
+
+        if (result.affectedRows > 0) {
+            console.log(`Cleared ignore list for expertId: ${expertId}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
+            console.log(`Table: modreviewlog, Column: ${columnName}`);
+            
+            res.status(200).json({ 
+                message: 'Ignore list cleared successfully',
+                debug: {
+                    expertId,
+                    subjectId,
+                    qset,
+                    activePassage,
+                    table: 'modreviewlog',
+                    column: columnName
+                }
+            });
+        } else {
+            console.log(`No record found to clear for expertId: ${expertId}, subjectId: ${subjectId}, qset: ${qset}`);
+            console.log(`Table: modreviewlog, Column: ${columnName}`);
+            res.status(404).json({ 
+                error: 'No record found to clear',
+                debug: {
+                    expertId,
+                    subjectId,
+                    qset,
+                    activePassage,
+                    table: 'modreviewlog',
+                    column: columnName
+                }
+            });
+        }
+    } catch (err) {
+        console.error("Error clearing ignore list:", err);
+        res.status(500).json({ error: 'Error clearing ignore list' });
+    }
+};
+
 
 // Functions to check the expert logged in status
 
