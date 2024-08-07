@@ -26,6 +26,7 @@ router.post('/student-add-ignore-word', examExpertAdminController.addToStudentIg
 router.post('/undo-word', examExpertAdminController.removeFromIgnoreList);
 router.post('/student-undo-word', examExpertAdminController.removeFromStudentIgnoreList);
 router.post('/clear-ignore-list', examExpertAdminController.clearIgnoreList);  // New route
+router.post('/student-clear-ignore-list', examExpertAdminController.clearStudentIgnoreList)
 
 
 // Passage review submission route
