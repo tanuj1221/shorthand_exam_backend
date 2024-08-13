@@ -77,7 +77,7 @@ exports.loginStudent = async (req, res) => {
         `;
         const [loginAttempts] = await connection.query(checkLoginAttemptsQuery, [defaultIpAddress]);
 
-        if (loginAttempts[0].attempt_count > 10) {
+        if (loginAttempts[0].attempt_count > 15) {
             console.log(`Error: Excessive login attempts from IP ${defaultIpAddress}`);
             res.status(429).send('Too many login attempts. Please try again later.');
             return;
@@ -97,16 +97,16 @@ exports.loginStudent = async (req, res) => {
             const [batchResults] = await connection.query(checkBatchStatusQuery, [batchNo]);
 
             if (batchResults.length === 0) {
-                console.log(`Error: Batch not found for batchNo ${batchNo}`);
-                res.status(404).send('Batch not found');
+                // console.log(`Error: Batch not found for batchNo ${batchNo}`);
+                res.status(404).send('invalid credentials');
                 return;
             }
 
             const batchStatus = batchResults[0].batchstatus;
 
             if (batchStatus !== 'active') {
-                console.log(`Error: Batch ${batchNo} is not active. Current status: ${batchStatus}`);
-                res.status(401).send('Batch is not active');
+                // console.log(`Error: Batch ${batchNo} is not active. Current status: ${batchStatus}`);
+                res.status(401).send('invalid credentials');
                 return;
             }
 
@@ -118,7 +118,7 @@ exports.loginStudent = async (req, res) => {
             try {
                 decryptedStoredPassword = decrypt(student.password);
             } catch (error) {
-                console.error('Error decrypting stored password:', error);
+                // console.error('Error decrypting stored password:', error);
                 res.status(500).send('invalid credentials');
                 return;
             }
@@ -126,7 +126,7 @@ exports.loginStudent = async (req, res) => {
             try {
                 decryptedStoredPassword1 = decrypt(password);
             } catch (error) {
-                console.error('Error decrypting provided password:', error);
+                // console.error('Error decrypting provided password:', error);
                 res.status(500).send('invalid credentials');
                 return;
             }
@@ -160,15 +160,15 @@ exports.loginStudent = async (req, res) => {
 
                 res.send('Logged in successfully as a student!');
             } else {
-                console.log(`Error: Invalid credentials for student ${userId}`);
+                // console.log(`Error: Invalid credentials for student ${userId}`);
                 res.status(401).send('invalid credentials');
             }
         } else {
-            console.log(`Error: Student not found with ID ${userId}`);
+            // console.log(`Error: Student not found with ID ${userId}`);
             res.status(404).send('invalid credentials');
         }
     } catch (err) {
-        console.error('Database query error:', err);
+        // console.error('Database query error:', err);
         res.status(500).send('Internal server error');
     }
 };
@@ -212,7 +212,7 @@ exports.updateAudioLogTime = async (req, res) => {
 
         res.send(`Updated ${columnName} for student ${studentId} successfully!`);
     } catch (err) {
-        console.error('Failed to update audio log time:', err);
+        // console.error('Failed to update audio log time:', err);
         res.status(500).send('Internal server error');
     }
 };
@@ -296,7 +296,7 @@ exports.getStudentDetails = async (req, res) => {
         try {
             subjectsId = JSON.parse(student.subjectsId);
         } catch (err) {
-            console.error('Failed to parse subjectsId:', err);
+            // console.error('Failed to parse subjectsId:', err);
             return res.status(500).send('Invalid subjectsId format');
         }
 
@@ -330,7 +330,7 @@ exports.getStudentDetails = async (req, res) => {
         res.send(encryptedResponseData);
     } catch (err) {
         console.error('Failed to fetch student details:', err);
-        res.status(500).send(err.message);
+        res.status(500).send('Failed to fetch student details:');
     }
 };
 
@@ -351,7 +351,7 @@ exports.getaudios = async (req, res) => {
                 try {
                     student[field] = decrypt(student[field]);
                 } catch (err) {
-                    console.error(`Failed to decrypt field ${field}:`, err);
+                    // console.error(`Failed to decrypt field ${field}:`, err);
                     throw new Error(`Failed to decrypt field ${field}`);
                 }
             }
@@ -406,7 +406,7 @@ exports.getaudios = async (req, res) => {
 
         res.send(encryptedResponseData);
     } catch (err) {
-        console.error('Failed to fetch student details:', err);
+        // console.error('Failed to fetch student details:', err);
         res.status(500).send(err.message);
     }
 };
@@ -458,7 +458,7 @@ exports.updateAudioLogs = async (req, res) => {
 
         res.send(responseData);
     } catch (err) {
-        console.error('Failed to update audio logs:', err);
+        // console.error('Failed to update audio logs:', err);
         res.status(500).send(err.message);
     }
 };
@@ -515,8 +515,8 @@ exports.getAudioLogs = async (req, res) => {
             });
         }
     } catch (err) {
-        console.error('Failed to fetch audio logs:', err);
-        res.status(500).send(err.message);
+        // console.error('Failed to fetch audio logs:', err);
+        res.status(500).send('Failed to fetch student details:');
     }
 };
 
