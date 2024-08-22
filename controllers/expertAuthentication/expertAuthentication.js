@@ -338,7 +338,27 @@ exports.getStudentPassages = async (req, res) => {
             res.status(500).json({ error: 'Error fetching student passages' });
         }
     }
-
+    if(expertId === 101){
+        try {
+            const query = `
+                SELECT passageA, passageB, ansPassageA, ansPassageB, student_id, QPA, QPB
+                FROM modreviewlog 
+                WHERE subjectId = ? AND qset = ? AND student_id = ?
+                LIMIT 1
+            `;
+            const [results] = await connection.query(query, [subjectId, qset, studentId]);
+    
+            if (results.length > 0) {
+                console.log("Fetched student_id:", results[0].student_id);
+                res.status(200).json(results[0]);
+            } else {
+                res.status(404).json({ error: 'No passages found for this student' });
+            }
+        } catch (err) {
+            console.error("Error fetching student passages:", err);
+            res.status(500).json({ error: 'Error fetching student passages' });
+        }
+    }
 };
 
 exports.getPassagesByStudentId = async (req, res) => {
@@ -349,7 +369,7 @@ exports.getPassagesByStudentId = async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { studentId } = req.body;  // Changed from req.params to req.body
+    const { studentId } = req.body;
     const expertId = req.session.expertId;
 
     if(expertId === 8){
@@ -363,7 +383,7 @@ exports.getPassagesByStudentId = async (req, res) => {
     
             if (results.length > 0) {
                 console.log("Assigned student_id:", results[0].student_id);
-                res.status(200).json(results[0]);
+                res.status(200).json({ ...results[0], expertId }); // Include expertId in the response
             } else {
                 res.status(404).json({ error: 'No assigned passages found' });
             }
@@ -372,7 +392,7 @@ exports.getPassagesByStudentId = async (req, res) => {
             res.status(500).json({ error: 'Error fetching assigned passages' });
         }
     }
-    else if(expertId === 100){
+    else if(expertId === 100 || expertId === 101){
         let conn;
         try {
             conn = await connection.getConnection();
@@ -421,7 +441,7 @@ exports.getPassagesByStudentId = async (req, res) => {
 
                 await conn.commit();
                 console.log("Assigned student_id:", results[0].student_id);
-                res.status(200).json(results[0]);
+                res.status(200).json({ ...results[0], expertId }); // Include expertId in the response
             } else {
                 await conn.rollback();
                 res.status(404).json({ error: 'No assigned passages found' });
@@ -433,6 +453,9 @@ exports.getPassagesByStudentId = async (req, res) => {
         } finally {
             if (conn) conn.release();
         }
+    }
+    else{
+        res.status(403).json({ error: 'Forbidden' });
     }
 };
 
@@ -564,7 +587,7 @@ exports.getStudentIgnoreList = async (req, res) => {
             res.status(500).json({ error: 'Error fetching ignore list' });
         }
     }
-    else if(expertId === 100){
+    else if(expertId === 100 || expertId === 101){
         try {
             const columnName = activePassage === 'A' ? 'QPA' : 'QPB';
             
