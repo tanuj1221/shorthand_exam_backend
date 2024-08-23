@@ -393,65 +393,23 @@ exports.getPassagesByStudentId = async (req, res) => {
         }
     }
     else if(expertId === 100 || expertId === 101){
-        let conn;
         try {
-            conn = await connection.getConnection();
-            await conn.beginTransaction();
-
             const query = `
                 SELECT passageA, passageB, ansPassageA, ansPassageB, student_id, subjectId, qset, QPA, QPB
                 FROM modreviewlog 
                 WHERE student_id = ?
             `;
-            const [results] = await conn.query(query, [studentId]);
+            const [results] = await connection.query(query, [studentId]);
 
             if (results.length > 0) {
-                const { subjectId, qset, QPA, QPB } = results[0];
-
-                // Check if QPA and QPB are already filled
-                if (!QPA || !QPB) {
-                    // Fetch ignore lists
-                    const fetchIgnoreListsQuery = `
-                        SELECT Q${qset}PA as QPA, Q${qset}PB as QPB
-                        FROM qsetdb
-                        WHERE subject_id = ?
-                    `;
-                    const [ignoreListsResult] = await conn.query(fetchIgnoreListsQuery, [subjectId]);
-
-                    if (ignoreListsResult.length === 0) {
-                        await conn.rollback();
-                        return res.status(404).json({ error: 'Ignore lists not found for this subject and qset' });
-                    }
-
-                    const newQPA = QPA || ignoreListsResult[0].QPA;
-                    const newQPB = QPB || ignoreListsResult[0].QPB;
-
-                    // Update the modreviewlog with the ignore lists
-                    const updateIgnoreListsQuery = `
-                        UPDATE modreviewlog
-                        SET QPA = COALESCE(QPA, ?), QPB = COALESCE(QPB, ?)
-                        WHERE student_id = ? AND subjectId = ? AND qset = ?
-                    `;
-                    await conn.query(updateIgnoreListsQuery, [newQPA, newQPB, studentId, subjectId, qset]);
-
-                    // Update the results with new QPA and QPB
-                    results[0].QPA = newQPA;
-                    results[0].QPB = newQPB;
-                }
-
-                await conn.commit();
                 console.log("Assigned student_id:", results[0].student_id);
                 res.status(200).json({ ...results[0], expertId }); // Include expertId in the response
             } else {
-                await conn.rollback();
                 res.status(404).json({ error: 'No assigned passages found' });
             }
         } catch (err) {
-            if (conn) await conn.rollback();
             console.error("Error fetching assigned passages:", err);
             res.status(500).json({ error: 'Error fetching assigned passages' });
-        } finally {
-            if (conn) conn.release();
         }
     }
     else{
@@ -604,42 +562,25 @@ exports.getStudentIgnoreList = async (req, res) => {
             if (results.length > 0) {
                 const { ignoreList, student_id } = results[0];
                 
-                if (ignoreList) {
-                    // Split the ignore list string into an array
-                    const ignoreListArray = ignoreList.split(',').map(item => item.trim());
-                    
-                    console.log(`Fetched ignore list for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
-                    console.log(`Table: modreviewlog, Column: ${columnName}`);
-                    console.log(`Ignore list: ${ignoreListArray.join(', ')}`);
-                    
-                    res.status(200).json({ 
-                        ignoreList: ignoreListArray,
-                        debug: {
-                            expertId,
-                            student_id,
-                            subjectId,
-                            qset,
-                            activePassage,
-                            table: 'modreviewlog',
-                            column: columnName
-                        }
-                    });
-                } else {
-                    console.log(`No ignore list found for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
-                    console.log(`Table: modreviewlog, Column: ${columnName}`);
-                    res.status(404).json({ 
-                        error: 'No ignore list found',
-                        debug: {
-                            expertId,
-                            student_id,
-                            subjectId,
-                            qset,
-                            activePassage,
-                            table: 'modreviewlog',
-                            column: columnName
-                        }
-                    });
-                }
+                // Convert ignoreList to array if it exists, otherwise set to empty array
+                const ignoreListArray = ignoreList ? ignoreList.split(',').map(item => item.trim()) : [];
+                
+                console.log(`Fetched ignore list for expertId: ${expertId}, student_id: ${student_id}, subjectId: ${subjectId}, qset: ${qset}, activePassage: ${activePassage}`);
+                console.log(`Table: modreviewlog, Column: ${columnName}`);
+                console.log(`Ignore list: ${ignoreListArray.join(', ')}`);
+                
+                res.status(200).json({ 
+                    ignoreList: ignoreListArray,
+                    debug: {
+                        expertId,
+                        student_id,
+                        subjectId,
+                        qset,
+                        activePassage,
+                        table: 'modreviewlog',
+                        column: columnName
+                    }
+                });
             } else {
                 console.log(`No record found for expertId: ${expertId}, subjectId: ${subjectId}, qset: ${qset}`);
                 console.log(`Table: modreviewlog, Column: ${columnName}`);
