@@ -19,6 +19,8 @@ const schema = {
         end_time: 'TIME',
         day: 'INT',
         qset: 'INT',
+        is_handicap:'VARCHAR(100)',
+        examtype:'VARCHAR(100)',
     },
     studentlogs: {
         id: 'BIGINT PRIMARY KEY',
@@ -78,6 +80,15 @@ const schema = {
         audio2: 'VARCHAR(255)',
         passage2: 'LONGTEXT',
         testaudio: 'VARCHAR(255)'
+    },
+
+    computerTypingdb: {
+        id: 'INT PRIMARY KEY',
+        subjectId: 'INT REFERENCES subjectsdb(subjectId)',
+        text1: 'LONGTEXT',
+        passage1: 'LONGTEXT',
+        text2: 'LONGTEXT',
+        passage2: 'LONGTEXT'
     },
     audiologs: {
         student_id: 'BIGINT PRIMARY KEY REFERENCES students(student_id), REFERENCES studentlogs(student_id)',
