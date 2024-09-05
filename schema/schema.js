@@ -44,7 +44,7 @@ const schema = {
     },
     loginlogs: {
         id: 'BIGINT PRIMARY KEY',
-        student_id: 'BIGINT REFERENCES students(student_id), REFERENCES studentlogs(student_id)',
+        student_id: 'BIGINT REFERENCES studentlogs(student_id)',
         login_time: 'TIMESTAMP',
         ip_address: 'VARCHAR(50)',
         disk_id: 'VARCHAR(100)',
@@ -89,7 +89,7 @@ const schema = {
         testaudio: 'VARCHAR(255)'
     },
     audiologs: {
-        student_id: 'BIGINT PRIMARY KEY REFERENCES students(student_id), REFERENCES studentlogs(student_id)',
+        student_id: 'BIGINT PRIMARY KEY REFERENCES studentlogs(student_id)',
         trial: 'INT',
         passageA: 'INT',
         passageB: 'INT'
@@ -116,7 +116,7 @@ const schema = {
         question10: 'LONGTEXT'
     },
     textlogs: {
-        student_id: 'BIGINT PRIMARY KEY REFERENCES students(student_id), REFERENCES studentlogs(student_id)',
+        student_id: 'BIGINT PRIMARY KEY REFERENCES studentlogs(student_id)',
         mina: 'DECIMAL',
         texta: 'LONGTEXT',
         minb: 'DECIMAL',

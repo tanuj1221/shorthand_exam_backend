@@ -13,6 +13,7 @@ const { request } = require('http');
 
 exports.loginStudent = async (req, res) => {
     const { userId, password, ipAddress, diskIdentifier, macAddress } = req.body;
+    console.log(userId)
 
     const defaultIpAddress = ipAddress || "default";
     const defaultDiskIdentifier = diskIdentifier || "default";
@@ -89,6 +90,12 @@ exports.loginStudent = async (req, res) => {
         if (results.length > 0) {
             const student = results[0];
 
+            // Check if IsShorhthand is true (1)
+            // if (!student.IsShorthand) {
+            //     res.status(403).send('Access denied. Student is not eligible for shorthand exam.');
+            //     return;
+            // }
+
             // Fetch the batch number from the student record
             const batchNo = student.batchNo;
 
@@ -104,11 +111,11 @@ exports.loginStudent = async (req, res) => {
 
             const batchStatus = batchResults[0].batchstatus;
 
-            if (batchStatus !== 'active') {
-                // console.log(`Error: Batch ${batchNo} is not active. Current status: ${batchStatus}`);
-                res.status(401).send('invalid credentials');
-                return;
-            }
+            // if (batchStatus !== 'active') {
+            //     // console.log(`Error: Batch ${batchNo} is not active. Current status: ${batchStatus}`);
+            //     res.status(401).send('invalid credentials 1');
+            //     return;
+            // }
 
             // Fetch the exam center code from the student record
             const examCenterCode = student.center;
@@ -156,7 +163,7 @@ exports.loginStudent = async (req, res) => {
                     VALUES (?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE loginTime = ?, login = ?
                 `;
-                await connection.query(insertStudentLogsQuery, [userId, examCenterCode, loginTime, 'logged in', loginTime, 'logged in']);
+                await connection.query(insertStudentLogsQuery, [userId, examCenterCode, loginTime, 1, loginTime, 1]);
 
                 res.send('Logged in successfully as a student!');
             } else {
@@ -168,10 +175,12 @@ exports.loginStudent = async (req, res) => {
             res.status(404).send('invalid credentials');
         }
     } catch (err) {
-        // console.error('Database query error:', err);
+        console.log('Database query error:', err);
         res.status(500).send('Internal server error');
     }
 };
+
+
 exports.updateAudioLogTime = async (req, res) => {
     const { audioType } = req.body;
     const studentId = req.session.studentId;
@@ -272,196 +281,187 @@ const columnsToKeep = ['student_id', 'instituteId', 'batchNo', 'batchdate',
     
 
 
-exports.getStudentDetails = async (req, res) => {
-    // Assuming studentId is stored in the session
-    const studentId = req.session.studentId;
-
-    const studentQuery = 'SELECT * FROM students WHERE student_id = ?';
-    const subjectsQuery = 'SELECT * FROM subjectdb WHERE subjectId = ?';
-
-    try {
-        // Fetch student data
-        const [students] = await connection.query(studentQuery, [studentId]);
-        if (students.length === 0) {
-            return res.status(404).send('Student not found');
-        }
-        const student = students[0];
-
-        // Decrypt the encrypted fields
-
-        // Decrypt the encrypted fields
-
-        // Extract subjectsId and parse it to an array
-        let subjectsId;
+    exports.getStudentDetails = async (req, res) => {
+        const studentId = req.session.studentId;
+    
+        const studentQuery = 'SELECT * FROM students WHERE student_id = ?';
+        const subjectsQuery = 'SELECT * FROM subjectdb WHERE subjectId = ?';
+    
         try {
-            subjectsId = JSON.parse(student.subjectsId);
-        } catch (err) {
-            // console.error('Failed to parse subjectsId:', err);
-            return res.status(500).send('Invalid subjectsId format');
-        }
-
-        // Assuming you want the first subject from the array
-        const subjectId = subjectsId[0];
-
-        // Fetch the subject data
-        const [subjects] = await connection.query(subjectsQuery, [subjectId]);
-        if (subjects.length === 0) {
-            return res.status(404).send('Subject not found');
-        }
-        const subject = subjects[0];
-
-
-
-        // Combine data by spreading student and subject objects
-        const responseData = {
-            ...student,
-            ...subject, // Spread the subject properties into the main object
-            photo: student.base64 // Base64 encoded photo string
-        };
-      
-        // Encrypt all fields in responseData
-        const encryptedResponseData = {};
-        for (let key in responseData) {
-            if (responseData.hasOwnProperty(key)) {
-                encryptedResponseData[key] = encrypt(responseData[key].toString());
+            const [students] = await connection.query(studentQuery, [studentId]);
+    
+            if (students.length === 0) {
+                return res.status(404).send('Student not found');
             }
-        }
-
-        res.send(encryptedResponseData);
-    } catch (err) {
-        console.error('Failed to fetch student details:', err);
-        res.status(500).send('Failed to fetch student details:');
-    }
-};
-
-exports.getaudios = async (req, res) => {
-    const studentId = req.session.studentId;
-    const studentQuery = 'SELECT * FROM students WHERE student_id = ?';
-    const subjectsQuery = 'SELECT * FROM subjectdb WHERE subjectId = ?';
-    const audioQuery = "SELECT * FROM audiodb WHERE subjectId = ? AND qset = ?";
-
-    try {
-        const [students] = await connection.query(studentQuery, [studentId]);
-        if (students.length === 0) {
-            return res.status(404).send('Student not found');
-        }
-        const student = students[0];
-        for (const field in student) {
-            if (student.hasOwnProperty(field) && !columnsToKeep.includes(field)) {
-                try {
-                    student[field] = decrypt(student[field]);
-                } catch (err) {
-                    // console.error(`Failed to decrypt field ${field}:`, err);
-                    throw new Error(`Failed to decrypt field ${field}`);
+            const student = students[0];
+    
+            let subjectsId;
+            try {
+                subjectsId = JSON.parse(student.subjectsId);
+            } catch (err) {
+                return res.status(500).send('Invalid subjectsId format');
+            }
+    
+            const subjectId = subjectsId[0];
+    
+            const [subjects] = await connection.query(subjectsQuery, [subjectId]);
+    
+            if (subjects.length === 0) {
+                return res.status(404).send('Subject not found');
+            }
+            const subject = subjects[0];
+    
+            const responseData = {
+                ...student,
+                ...subject,
+                photo: student.base64
+            };
+          
+            const encryptedResponseData = {};
+            for (let key in responseData) {
+                if (responseData.hasOwnProperty(key)) {
+                    if (responseData[key] === null) {
+                        encryptedResponseData[key] = encrypt('null');
+                    } else {
+                        encryptedResponseData[key] = encrypt(responseData[key].toString());
+                    }
                 }
             }
+    
+            res.send(encryptedResponseData);
+        } catch (err) {
+            res.status(500).send('Failed to fetch student details');
         }
+    };
+
+    exports.getaudios = async (req, res) => {
+        const studentId = req.session.studentId;
+        const studentQuery = 'SELECT * FROM students WHERE student_id = ?';
+        const subjectsQuery = 'SELECT * FROM subjectdb WHERE subjectId = ?';
+        const audioQuery = "SELECT * FROM audiodb WHERE subjectId = ? AND qset = ?";
+
+        try {
+            const [students] = await connection.query(studentQuery, [studentId]);
+            if (students.length === 0) {
+                return res.status(404).send('Student not found');
+            }
+            const student = students[0];
+            for (const field in student) {
+                if (student.hasOwnProperty(field) && !columnsToKeep.includes(field)) {
+                    try {
+                        student[field] = decrypt(student[field]);
+                    } catch (err) {
+                        // console.error(`Failed to decrypt field ${field}:`, err);
+                        throw new Error(`Failed to decrypt field ${field}`);
+                    }
+                }
+            }
+        
+
+
+
+            // Extract subjectsId and parse it to an array
+            const subjectsId = JSON.parse(student.subjectsId);
+            const qset = student.qset
+            console.log(qset)
+
+            // Assuming you want the first subject from the array
+            const subjectId = subjectsId[0];
+            const [subjects] = await connection.query(subjectsQuery, [subjectId]);
+            if (subjects.length === 0) {
+                return res.status(404).send('Subject not found');
+            }
+            const subject = subjects[0];
+
+
+            const [auidos] = await connection.query(audioQuery, [subjectId, qset]);
+            if (auidos.length === 0) {
+                return res.status(404).send('audio not found');
+            }
+            const audio = auidos[0];
+        
+
+            const responseData = {
+                subjectId: subject.subjectId,
+                courseId: subject.courseId,
+                subject_name: subject.subject_name,
+                subject_name_short: subject.subject_name_short,
+                Daily_Timer: subject.Daily_Timer,
+                Passage_Timer: subject.Passage_Timer,
+                Demo_Timer: subject.Demo_Timer,
+                audio1: audio.audio1,
+                passage1: audio.passage1,
+                audio2: audio.audio2,
+                passage2: audio.passage2,
+                testaudio:audio.testaudio   
+            };
     
 
-
-
-        // Extract subjectsId and parse it to an array
-        const subjectsId = JSON.parse(student.subjectsId);
-        const qset = student.qset
-        console.log(qset)
-
-        // Assuming you want the first subject from the array
-        const subjectId = subjectsId[0];
-        const [subjects] = await connection.query(subjectsQuery, [subjectId]);
-        if (subjects.length === 0) {
-            return res.status(404).send('Subject not found');
-        }
-        const subject = subjects[0];
-
-
-        const [auidos] = await connection.query(audioQuery, [subjectId, qset]);
-        if (auidos.length === 0) {
-            return res.status(404).send('audio not found');
-        }
-        const audio = auidos[0];
-       
-
-        const responseData = {
-            subjectId: subject.subjectId,
-            courseId: subject.courseId,
-            subject_name: subject.subject_name,
-            subject_name_short: subject.subject_name_short,
-            Daily_Timer: subject.Daily_Timer,
-            Passage_Timer: subject.Passage_Timer,
-            Demo_Timer: subject.Demo_Timer,
-            audio1: audio.audio1,
-            passage1: audio.passage1,
-            audio2: audio.audio2,
-            passage2: audio.passage2,
-            testaudio:audio.testaudio   
-        };
-  
-
-        const encryptedResponseData = {};
-        for (let key in responseData) {
-            if (responseData.hasOwnProperty(key)) {
-                encryptedResponseData[key] = encrypt(responseData[key].toString());
-            }
-        }
-
-        res.send(encryptedResponseData);
-    } catch (err) {
-        // console.error('Failed to fetch student details:', err);
-        res.status(500).send(err.message);
-    }
-};
-exports.updateAudioLogs = async (req, res) => {
-    const studentId = req.session.studentId;
-    const { audio_type, percentage } = req.body;
-
-
-    if (!studentId) {
-        return res.status(400).send('Student ID is required');
-    }
-
-    if (!audio_type || !['trial', 'passageA', 'passageB'].includes(audio_type)) {
-        return res.status(400).send('Valid audio type is required');
-    }
-
-    const findAudioLogQuery = `SELECT * FROM audiologs WHERE student_id = ?`;
-    const updateAudioLogQuery = `UPDATE audiologs SET ${audio_type} = ? WHERE student_id = ?`;
-    
-    let insertAudioLogQuery;
-    if (audio_type === 'trial') {
-        insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, ?, 0, 0)`;
-    } else if (audio_type === 'passageA') {
-        insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, 0, ?, 0)`;
-    } else if (audio_type === 'passageB') {
-        insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, 0, 0, ?)`;
-    }
-
-    try {
-        const [rows] = await connection.query(findAudioLogQuery, [studentId]);
-
-        if (rows.length > 0) {
-            const existingLog = rows[0];
-
-            if (percentage === 0 && existingLog[audio_type] !== 0) {
-                return res.status(400).send(`Cannot update ${audio_type} to 0 as existing log is non-zero.`);
+            const encryptedResponseData = {};
+            for (let key in responseData) {
+                if (responseData.hasOwnProperty(key)) {
+                    encryptedResponseData[key] = encrypt(responseData[key].toString());
+                }
             }
 
-            await connection.query(updateAudioLogQuery, [percentage, studentId]);
-        } else {
-            await connection.query(insertAudioLogQuery, [studentId, percentage]);
+            res.send(encryptedResponseData);
+        } catch (err) {
+            // console.error('Failed to fetch student details:', err);
+            res.status(500).send(err.message);
+        }
+    };
+    exports.updateAudioLogs = async (req, res) => {
+        const studentId = req.session.studentId;
+        const { audio_type, percentage } = req.body;
+
+
+        if (!studentId) {
+            return res.status(400).send('Student ID is required');
         }
 
-        const responseData = {
-            student_id: studentId,
-            audio_type: audio_type,
-            percentage: percentage // Stored as a number
-        };
+        if (!audio_type || !['trial', 'passageA', 'passageB'].includes(audio_type)) {
+            return res.status(400).send('Valid audio type is required');
+        }
 
-        res.send(responseData);
-    } catch (err) {
-        // console.error('Failed to update audio logs:', err);
-        res.status(500).send(err.message);
-    }
-};
+        const findAudioLogQuery = `SELECT * FROM audiologs WHERE student_id = ?`;
+        const updateAudioLogQuery = `UPDATE audiologs SET ${audio_type} = ? WHERE student_id = ?`;
+        
+        let insertAudioLogQuery;
+        if (audio_type === 'trial') {
+            insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, ?, 0, 0)`;
+        } else if (audio_type === 'passageA') {
+            insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, 0, ?, 0)`;
+        } else if (audio_type === 'passageB') {
+            insertAudioLogQuery = `INSERT INTO audiologs (student_id, trial, passageA, passageB) VALUES (?, 0, 0, ?)`;
+        }
+
+        try {
+            const [rows] = await connection.query(findAudioLogQuery, [studentId]);
+
+            if (rows.length > 0) {
+                const existingLog = rows[0];
+
+                if (percentage === 0 && existingLog[audio_type] !== 0) {
+                    return res.status(400).send(`Cannot update ${audio_type} to 0 as existing log is non-zero.`);
+                }
+
+                await connection.query(updateAudioLogQuery, [percentage, studentId]);
+            } else {
+                await connection.query(insertAudioLogQuery, [studentId, percentage]);
+            }
+
+            const responseData = {
+                student_id: studentId,
+                audio_type: audio_type,
+                percentage: percentage // Stored as a number
+            };
+
+            res.send(responseData);
+        } catch (err) {
+            // console.error('Failed to update audio logs:', err);
+            res.status(500).send(err.message);
+        }
+    };
 
 
 exports.getAudioLogs = async (req, res) => {
